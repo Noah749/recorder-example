@@ -1,0 +1,25 @@
+{
+  "name": "meeting-recorder",
+  "version": "0.1.0",
+  "description": "跨平台会议自动录制工具",
+  "main": "index.js",
+  "scripts": {
+    "install": "node-gyp rebuild",
+    "test": "node test.js"
+  },
+  "keywords": [
+    "audio",
+    "recording",
+    "meeting"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "bindings": "^1.5.0",
+    "node-addon-api": "^7.0.0"
+  },
+  "devDependencies": {
+    "node-gyp": "^10.0.1"
+  },
+  "gypfile": true
+} 
