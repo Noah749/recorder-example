@@ -7,7 +7,8 @@
       "sources": [ 
         "src/recorder.cpp",
         "src/main.cpp",
-        "src/logger.cpp"
+        "src/logger.cpp",
+        "src/mac_recorder.cpp"
       ],
       "include_dirs": [
         "<!@(node -p \"require('node-addon-api').include\")",
@@ -29,7 +30,9 @@
             "libraries": [
               "-framework CoreAudio",
               "-framework AudioToolbox",
-              "-framework CoreFoundation"
+              "-framework AudioUnit",
+              "-framework CoreFoundation",
+              "-framework CoreServices"
             ]
           }
         }],

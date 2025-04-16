@@ -4,6 +4,9 @@
 #include <string>
 #include <atomic>
 
+// 前向声明
+class MacRecorder;
+
 class AudioRecorder {
 public:
     AudioRecorder();
@@ -44,7 +47,7 @@ private:
     int speakerNoiseReductionLevel_;
     
     // 平台相关实现的指针
-    void* platformImpl_;
+    MacRecorder* platformImpl_;
 };
 
 class RecorderWrapper : public Napi::ObjectWrap<RecorderWrapper> {

@@ -1,5 +1,6 @@
 #include "recorder.h"
 #include "logger.h"
+#include "mac_recorder.h"
 
 // 基础实现，后续会根据平台进行具体功能实现
 AudioRecorder::AudioRecorder() 
@@ -12,7 +13,13 @@ AudioRecorder::AudioRecorder()
     Logger::init();
     Logger::info("AudioRecorder 初始化");
     
-    // 平台特定初始化会在扩展实现
+    // 创建平台特定实现
+#ifdef __APPLE__
+    platformImpl_ = new MacRecorder(this);
+    Logger::info("使用 macOS 录音实现");
+#else
+    Logger::warn("当前平台尚未实现录音功能");
+#endif
 }
 
 AudioRecorder::~AudioRecorder() {
@@ -20,7 +27,15 @@ AudioRecorder::~AudioRecorder() {
     if (isRecording_) {
         Stop();
     }
+    
     // 清理平台特定资源
+    if (platformImpl_) {
+#ifdef __APPLE__
+        delete platformImpl_;
+#endif
+        platformImpl_ = nullptr;
+    }
+    
     Logger::shutdown();
 }
 
@@ -31,12 +46,26 @@ bool AudioRecorder::Start() {
         return false;
     }
     
-    isRecording_ = true;
-    isPaused_ = false;
+    // 使用平台实现
+    bool success = false;
+    if (platformImpl_) {
+#ifdef __APPLE__
+        success = platformImpl_->Start();
+#endif
+    } else {
+        Logger::error("平台实现为空，无法开始录制");
+        return false;
+    }
     
-    Logger::info("录制状态设置为: 录制中");
-    // 实际开始录制的代码将在平台特定实现中
-    return true;
+    if (success) {
+        isRecording_ = true;
+        isPaused_ = false;
+        Logger::info("录制状态设置为: 录制中");
+    } else {
+        Logger::error("平台录制启动失败");
+    }
+    
+    return success;
 }
 
 void AudioRecorder::Stop() {
@@ -46,11 +75,16 @@ void AudioRecorder::Stop() {
         return;
     }
     
+    // 使用平台实现
+    if (platformImpl_) {
+#ifdef __APPLE__
+        platformImpl_->Stop();
+#endif
+    }
+    
     isRecording_ = false;
     isPaused_ = false;
-    
     Logger::info("录制状态设置为: 已停止");
-    // 实际停止录制的代码将在平台特定实现中
 }
 
 void AudioRecorder::Pause() {
@@ -60,10 +94,15 @@ void AudioRecorder::Pause() {
         return;
     }
     
-    isPaused_ = true;
+    // 使用平台实现
+    if (platformImpl_) {
+#ifdef __APPLE__
+        platformImpl_->Pause();
+#endif
+    }
     
+    isPaused_ = true;
     Logger::info("录制状态设置为: 已暂停");
-    // 实际暂停录制的代码将在平台特定实现中
 }
 
 void AudioRecorder::Resume() {
@@ -73,10 +112,15 @@ void AudioRecorder::Resume() {
         return;
     }
     
-    isPaused_ = false;
+    // 使用平台实现
+    if (platformImpl_) {
+#ifdef __APPLE__
+        platformImpl_->Resume();
+#endif
+    }
     
+    isPaused_ = false;
     Logger::info("录制状态设置为: 录制中(恢复)");
-    // 实际恢复录制的代码将在平台特定实现中
 }
 
 bool AudioRecorder::IsRecording() const {
@@ -88,11 +132,24 @@ bool AudioRecorder::IsRecording() const {
 void AudioRecorder::SetOutputPath(const std::string& path) {
     Logger::info("设置输出路径: %s", path.c_str());
     outputPath_ = path;
+    
+    // 设置平台实现的输出路径
+    if (platformImpl_) {
+#ifdef __APPLE__
+        platformImpl_->SetOutputPath(path);
+#endif
+    }
 }
 
 std::string AudioRecorder::GetCurrentMicrophoneApp() {
     Logger::info("获取当前占用麦克风的应用");
-    // 平台特定实现
+    
+    if (platformImpl_) {
+#ifdef __APPLE__
+        return platformImpl_->GetCurrentMicrophoneApp();
+#endif
+    }
+    
     return "Unknown Application";
 }
 
@@ -103,7 +160,12 @@ void AudioRecorder::SetMicNoiseReduction(int level) {
     Logger::info("设置麦克风降噪级别: %d", level);
     micNoiseReductionLevel_ = level;
     
-    // 应用设置的代码将在平台特定实现中
+    // 设置平台实现的降噪级别
+    if (platformImpl_) {
+#ifdef __APPLE__
+        platformImpl_->SetMicNoiseReduction(level);
+#endif
+    }
 }
 
 void AudioRecorder::SetSpeakerNoiseReduction(int level) {
@@ -113,7 +175,12 @@ void AudioRecorder::SetSpeakerNoiseReduction(int level) {
     Logger::info("设置扬声器降噪级别: %d", level);
     speakerNoiseReductionLevel_ = level;
     
-    // 应用设置的代码将在平台特定实现中
+    // 设置平台实现的降噪级别
+    if (platformImpl_) {
+#ifdef __APPLE__
+        platformImpl_->SetSpeakerNoiseReduction(level);
+#endif
+    }
 }
 
 // RecorderWrapper 实现
