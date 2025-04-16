@@ -34,6 +34,16 @@ npm install
 npm install
 ```
 
+## 打包和发布
+
+```bash
+# 构建和打包
+npm run pack
+
+# 打包后的文件在 dist 目录下
+# 预编译的二进制文件在 prebuilds 目录下
+```
+
 ## 使用示例
 
 ```javascript
@@ -95,4 +105,10 @@ console.log('正在录制:', recorderInstance.isRecording());
 ```bash
 # 运行测试
 npm test
+
+# 下载依赖库
+npm run download-deps
+
+# 构建项目
+npm run build
 ```
