@@ -5,9 +5,9 @@
       "cflags!": [ "-fno-exceptions" ],
       "cflags_cc!": [ "-fno-exceptions" ],
       "sources": [ 
-        "src/recorder.cc",
-        "src/main.cc",
-        "src/logger.cc"
+        "src/recorder.cpp",
+        "src/main.cpp",
+        "src/logger.cpp"
       ],
       "include_dirs": [
         "<!@(node -p \"require('node-addon-api').include\")",
