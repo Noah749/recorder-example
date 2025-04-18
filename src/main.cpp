@@ -7,6 +7,10 @@
 #include <iomanip>
 #include "recorder.h"
 #include "logger.h"
+#include "av_engine_test.h"
+
+// 声明测试函数
+void TestAVAudioEngine();
 
 int main(int argc, char* argv[]) {
     // 初始化日志系统
@@ -44,6 +48,9 @@ int main(int argc, char* argv[]) {
 
     recorder.Stop();
     std::cout << "录音已停止，文件保存在: " << outputPath << std::endl;
+
+    // 运行 AVAudioEngine 测试
+    // TestAVAudioEngine();
 
     return 0;
 } 

@@ -5,7 +5,6 @@
 #include <thread>
 #include <mutex>
 #include <vector>
-#include <CoreAudio/CoreAudio.h>
 #include <AudioToolbox/AudioToolbox.h>
 
 // 前向声明
