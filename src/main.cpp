@@ -1,5 +1,10 @@
 #include <iostream>
 #include <string>
+#include <filesystem>
+#include <chrono>
+#include <thread>
+#include <sstream>
+#include <iomanip>
 #include "recorder.h"
 #include "logger.h"
 
@@ -9,25 +14,36 @@ int main(int argc, char* argv[]) {
     Logger::setLevel(Logger::Level::DEBUG);
     Logger::info("启动本地录音程序");
 
+    // 设置默认输出路径
+    std::string outputPath;
     if (argc < 2) {
-        std::cout << "使用方法: " << argv[0] << " <输出文件路径>" << std::endl;
-        return 1;
+        // 获取当前工作目录
+        std::filesystem::path currentPath = std::filesystem::current_path();
+        // 设置默认输出文件名为当前时间戳
+        auto now = std::chrono::system_clock::now();
+        auto now_time_t = std::chrono::system_clock::to_time_t(now);
+        std::stringstream ss;
+        ss << std::put_time(std::localtime(&now_time_t), "%Y%m%d_%H%M%S");
+        outputPath = (currentPath / ("recording_" + ss.str() + ".wav")).string();
+        std::cout << "未指定输出路径，将使用默认路径: " << outputPath << std::endl;
+    } else {
+        outputPath = argv[1];
     }
 
     AudioRecorder recorder;
-    recorder.SetOutputPath(argv[1]);
+    recorder.SetOutputPath(outputPath);
 
-    std::cout << "开始录音，按 Enter 键停止..." << std::endl;
+    std::cout << "开始录制 5 秒..." << std::endl;
     if (!recorder.Start()) {
         std::cerr << "启动录音失败" << std::endl;
         return 1;
     }
 
-    // 等待用户输入
-    std::cin.get();
+    // 等待 5 秒
+    std::this_thread::sleep_for(std::chrono::seconds(5));
 
     recorder.Stop();
-    std::cout << "录音已停止，文件保存在: " << argv[1] << std::endl;
+    std::cout << "录音已停止，文件保存在: " << outputPath << std::endl;
 
     return 0;
 } 

@@ -3,4 +3,7 @@ build
 dist
 logs
 prebuilds
+cmake-build-debug
+cmake
+.idea
 test-recording.wav
