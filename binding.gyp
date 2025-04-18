@@ -6,13 +6,15 @@
       "cflags_cc!": [ "-fno-exceptions" ],
       "sources": [ 
         "src/recorder.cpp",
-        "src/main.cpp",
         "src/logger.cpp",
-        "src/mac_recorder.cpp"
+        "src/mac_recorder.cpp",
+        "src/nodejs/main_node.cpp",
+        "src/nodejs/node_recorder.cpp"
       ],
       "include_dirs": [
         "<!@(node -p \"require('node-addon-api').include\")",
-        "./deps/spdlog-1.12.0/include"
+        "./deps/spdlog-1.12.0/include",
+        "./src"
       ],
       "defines": [ 
         "NAPI_DISABLE_CPP_EXCEPTIONS",
