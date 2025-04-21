@@ -1,5 +1,7 @@
 #include <iostream>
 #import <AVFoundation/AVFoundation.h>
+#import <AudioToolbox/AudioToolbox.h>
+#import <CoreAudio/CoreAudio.h>
 #include "av_engine_test.h"
 
 AVAudioEngineTest::AVAudioEngineTest() {
@@ -18,7 +20,6 @@ AVAudioEngineTest::AVAudioEngineTest() {
 
 AVAudioEngineTest::~AVAudioEngineTest() {
     [audioEngine_ stop];
-    // ARC 会自动管理内存，不需要手动 release
 }
 
 bool AVAudioEngineTest::Start() {

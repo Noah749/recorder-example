@@ -1,5 +1,10 @@
 #include "av_engine_test.h"
 #include "logger.h"
+#import <CoreAudio/CoreAudio.h>
+#import <CoreAudio/CoreAudioTypes.h>
+#import <CoreAudio/AudioHardware.h>
+#import <AudioToolbox/AudioToolbox.h>
+#import <AudioUnit/AudioUnit.h>
 
 void TestAVAudioEngine() {
     @autoreleasepool {

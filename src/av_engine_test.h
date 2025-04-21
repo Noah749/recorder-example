@@ -18,4 +18,4 @@ private:
     AVAudioOutputNode* outputNode_;
     AVAudioMixerNode* mixerNode_;
     AVAudioFormat* audioFormat_;
-}; 
+};

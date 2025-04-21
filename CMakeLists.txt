@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(recorder)
+project(recorder VERSION 1.0.0)
 
 # 设置 C++ 标准
 set(CMAKE_CXX_STANDARD 17)
@@ -9,9 +9,18 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_OBJC_COMPILER "/usr/bin/clang")
 set(CMAKE_OBJCXX_COMPILER "/usr/bin/clang++")
 
+# 设置 SDK 路径
+set(CMAKE_OSX_SYSROOT "/Library/Developer/CommandLineTools/SDKs/MacOSX15.4.sdk")
+set(CMAKE_OSX_DEPLOYMENT_TARGET "14.2")
+
 # 查找必要的框架
 find_library(AVFoundation AVFoundation REQUIRED)
 find_library(Foundation Foundation REQUIRED)
+find_library(CoreAudio CoreAudio REQUIRED)
+find_library(AudioToolbox AudioToolbox REQUIRED)
+find_library(AudioUnit AudioUnit REQUIRED)
+find_library(CoreFoundation CoreFoundation REQUIRED)
+find_library(CoreServices CoreServices REQUIRED)
 
 # 添加源文件
 add_executable(recorder
@@ -21,11 +30,13 @@ add_executable(recorder
     src/logger.cpp
     src/av_engine_test.mm
     src/av_engine_test_main.mm
+    src/core_audio_taps_test_main.mm
 )
 
 # 设置 Objective-C++ 编译选项
 set_target_properties(recorder PROPERTIES
     COMPILE_FLAGS "-x objective-c++ -fobjc-arc"
+    OUTPUT_NAME "recorder"
 )
 
 # 添加 spdlog 子目录
@@ -42,11 +53,11 @@ target_link_libraries(recorder PRIVATE
     spdlog::spdlog
     ${AVFoundation}
     ${Foundation}
-    "-framework CoreAudio"
-    "-framework AudioToolbox"
-    "-framework AudioUnit"
-    "-framework CoreFoundation"
-    "-framework CoreServices"
+    ${CoreAudio}
+    ${AudioToolbox}
+    ${AudioUnit}
+    ${CoreFoundation}
+    ${CoreServices}
 )
 
 # 设置输出目录
@@ -57,4 +68,27 @@ set_target_properties(recorder PROPERTIES
 # 安装目标
 install(TARGETS recorder
     RUNTIME DESTINATION bin
+)
+
+# 添加 entitlements 文件
+set_target_properties(recorder PROPERTIES
+    XCODE_ATTRIBUTE_CODE_SIGN_ENTITLEMENTS "${CMAKE_CURRENT_SOURCE_DIR}/src/recorder.entitlements"
+)
+
+# 创建 entitlements 文件
+file(WRITE ${CMAKE_CURRENT_SOURCE_DIR}/src/recorder.entitlements
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+    "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+    "<plist version=\"1.0\">\n"
+    "<dict>\n"
+    "    <key>com.apple.security.app-sandbox</key>\n"
+    "    <true/>\n"
+    "    <key>com.apple.security.assets.music.read-write</key>\n"
+    "    <true/>\n"
+    "    <key>com.apple.security.device.audio-input</key>\n"
+    "    <true/>\n"
+    "    <key>com.apple.security.files.user-selected.read-write</key>\n"
+    "    <true/>\n"
+    "</dict>\n"
+    "</plist>\n"
 ) 

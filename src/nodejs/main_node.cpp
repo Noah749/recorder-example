@@ -10,4 +10,4 @@ Napi::Object InitAll(Napi::Env env, Napi::Object exports) {
     return RecorderWrapper::Init(env, exports);
 }
 
-NODE_API_MODULE(meeting_recorder, InitAll) 
+NODE_API_MODULE(meeting_recorder, InitAll);
