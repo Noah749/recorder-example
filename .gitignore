@@ -6,4 +6,5 @@ prebuilds
 cmake-build-debug
 cmake
 .idea
+CapturingSystemAudioWithCoreAudioTaps-oc
 test-recording.wav
