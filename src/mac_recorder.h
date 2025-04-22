@@ -6,6 +6,7 @@
 #include <mutex>
 #include <vector>
 #include <AVFoundation/AVFoundation.h>
+#include "mac_system_audio_node.h"
 
 // 前向声明
 class AudioRecorder;
@@ -59,7 +60,7 @@ private:
     // AVAudioEngine 相关
     AVAudioEngine* audioEngine_;
     AVAudioInputNode* inputNode_;  // 麦克风输入节点
-    AVAudioInputNode* systemNode_; // 系统音频输入节点
+    MacSystemAudioNode* systemNode_; // 系统音频输入节点
     AVAudioMixerNode* mixerNode_;  // 混合节点
     AVAudioFormat* audioFormat_;
     

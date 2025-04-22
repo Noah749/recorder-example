@@ -27,6 +27,7 @@ add_executable(recorder
     src/main.cpp
     src/recorder.cpp
     src/mac_recorder.cpp
+    src/mac_system_audio_node.mm
     src/logger.cpp
     src/av_engine_test.mm
     src/av_engine_test_main.mm

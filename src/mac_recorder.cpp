@@ -74,6 +74,9 @@ bool MacRecorder::Start() {
         return false;
     }
     
+    // 启动系统音频捕获
+    [systemNode_ startCapture];
+    
     // 启动音频引擎
     NSError* error = nil;
     if (![audioEngine_ startAndReturnError:&error]) {
@@ -108,6 +111,9 @@ void MacRecorder::Stop() {
     
     // 使用try-catch防止异常导致卡住
     try {
+        // 停止系统音频捕获
+        [systemNode_ stopCapture];
+        
         // 停止音频引擎
         if (audioEngine_) {
             [audioEngine_ stop];
@@ -235,10 +241,10 @@ bool MacRecorder::InitializeAudio() {
         return false;
     }
     
-    // 获取系统音频输入节点
-    systemNode_ = [audioEngine_ inputNode];
+    // 创建系统音频输入节点
+    systemNode_ = [MacSystemAudioNode nodeWithEngine:audioEngine_];
     if (!systemNode_) {
-        Logger::error("MacRecorder: 获取系统音频输入节点失败");
+        Logger::error("MacRecorder: 创建系统音频输入节点失败");
         return false;
     }
     
@@ -271,7 +277,7 @@ bool MacRecorder::InitializeAudio() {
     [mixerNode_ setVolume:systemAudioVolume_];
     
     // 在混合节点上安装tap来获取混合后的音频
-    MacRecorder* __weak weakSelf = this;
+    __block MacRecorder* weakSelf = this;
     [mixerNode_ installTapOnBus:0
                      bufferSize:1024
                          format:audioFormat_
