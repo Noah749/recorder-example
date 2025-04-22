@@ -5,6 +5,7 @@
 #include "logger.h"
 #include <vector>
 #include <memory>
+#include <functional>
 
 class AudioSystemCapture {
 public:
@@ -26,8 +27,8 @@ public:
     // 停止循环播放
     void StopLoopback();
     
-    // 获取录制文件URL
-    NSURL* GetRecordingURL() const { return recordingURL_; }
+    // 设置音频数据回调
+    void SetAudioDataCallback(std::function<void(const AudioBufferList*, UInt32)> callback);
     
 private:
     // 设备属性监听回调
@@ -56,12 +57,6 @@ private:
     // 注销监听器
     void UnregisterListeners();
     
-    // 创建录制文件
-    bool MakeRecordingFiles();
-    
-    // 清理录制文件
-    void CleanUpRecordingFiles();
-    
     // 开始IO
     bool StartIO();
     
@@ -77,7 +72,6 @@ private:
     std::shared_ptr<std::vector<AudioStreamBasicDescription>> outputStreamList_;
     bool recordingEnabled_;
     bool loopbackEnabled_;
-    NSURL* recordingURL_;
-    std::shared_ptr<std::vector<ExtAudioFileRef>> fileList_;
     AudioDeviceIOProcID ioProcID_;
+    std::function<void(const AudioBufferList*, UInt32)> audioDataCallback_;
 }; 

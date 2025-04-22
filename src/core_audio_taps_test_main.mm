@@ -11,13 +11,65 @@
 #import <CoreAudio/CATapDescription.h>
 #include <CoreFoundation/CoreFoundation.h>
 #include <vector>
+#include <string>
+
+// 全局变量
+ExtAudioFileRef audioFile = nullptr;
+AudioStreamBasicDescription outputFormat;
+AudioStreamBasicDescription inputFormat;
+
+void AudioDataCallback(const AudioBufferList* inInputData, UInt32 inNumberFrames) {
+    if (!audioFile) {
+        return;
+    }
+    
+    // 写入音频数据
+    OSStatus status = ExtAudioFileWrite(audioFile, inNumberFrames, inInputData);
+    if (status != noErr) {
+        Logger::error("写入音频数据失败: %d", (int)status);
+    }
+}
 
 void TestCoreAudioTaps() {
     @autoreleasepool {
         Logger::info("开始测试 core audio taps");
 
+        // 设置输出格式
+        memset(&outputFormat, 0, sizeof(outputFormat));
+        outputFormat.mSampleRate = 44100;
+        outputFormat.mFormatID = kAudioFormatLinearPCM;
+        outputFormat.mFormatFlags = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked;
+        outputFormat.mBitsPerChannel = 32;
+        outputFormat.mChannelsPerFrame = 2;
+        outputFormat.mFramesPerPacket = 1;
+        outputFormat.mBytesPerFrame = outputFormat.mChannelsPerFrame * outputFormat.mBitsPerChannel / 8;
+        outputFormat.mBytesPerPacket = outputFormat.mBytesPerFrame;
+
+        // 创建音频文件
+        CFURLRef fileURL = CFURLCreateWithFileSystemPath(kCFAllocatorDefault,
+                                                        CFSTR("test_audio.caf"),
+                                                        kCFURLPOSIXPathStyle,
+                                                        false);
+        
+        OSStatus status = ExtAudioFileCreateWithURL(fileURL,
+                                                  kAudioFileCAFType,
+                                                  &outputFormat,
+                                                  nullptr,
+                                                  kAudioFileFlags_EraseFile,
+                                                  &audioFile);
+        CFRelease(fileURL);
+        
+        if (status != noErr) {
+            Logger::error("创建音频文件失败: %d", (int)status);
+            return;
+        }
+        Logger::info("创建音频文件成功");
+
         AudioDeviceManager manager;
         AudioSystemCapture capture;
+
+        // 设置音频数据回调
+        capture.SetAudioDataCallback(AudioDataCallback);
 
         // 查找并删除指定名称的设备
         auto devicesToRemove = manager.GetAggregateDevicesByName("plaud.ai Aggregate Audio Device");
@@ -42,6 +94,8 @@ void TestCoreAudioTaps() {
         AudioObjectID deviceID = manager.CreateAggregateDevice("plaud.ai Aggregate Audio Device");
         if (deviceID == kAudioObjectUnknown) {
             Logger::error("创建聚合设备失败");
+            ExtAudioFileDispose(audioFile);
+            audioFile = nullptr;
             return;
         }
         Logger::info("成功创建聚合设备，ID: %u", (unsigned int)deviceID);
@@ -50,6 +104,8 @@ void TestCoreAudioTaps() {
         AudioObjectID tapID = manager.CreateTap(@"plaud.ai tap");
         if (tapID == kAudioObjectUnknown) {
             Logger::error("创建 tap 失败");
+            ExtAudioFileDispose(audioFile);
+            audioFile = nullptr;
             return;
         }
         Logger::info("成功创建 tap，ID: %u", (unsigned int)tapID);
@@ -57,6 +113,8 @@ void TestCoreAudioTaps() {
         // 添加 tap 到设备
         if (!manager.AddTapToDevice(tapID, deviceID)) {
             Logger::error("添加 tap 到设备失败");
+            ExtAudioFileDispose(audioFile);
+            audioFile = nullptr;
             return;
         }
         Logger::info("成功将 tap 添加到设备");
@@ -65,6 +123,8 @@ void TestCoreAudioTaps() {
         capture.SetDeviceID(deviceID);
         if (!capture.StartRecording()) {
             Logger::error("开始录制失败");
+            ExtAudioFileDispose(audioFile);
+            audioFile = nullptr;
             return;
         }
         Logger::info("开始录制成功");
@@ -76,26 +136,12 @@ void TestCoreAudioTaps() {
         capture.StopRecording();
         Logger::info("停止录制");
 
-        // 获取录制文件URL
-        NSURL* recordingURL = capture.GetRecordingURL();
-        if (recordingURL) {
-            Logger::info("录制文件保存在: %s", [[recordingURL path] UTF8String]);
-        }
+        // 关闭音频文件
+        ExtAudioFileDispose(audioFile);
+        audioFile = nullptr;
+        Logger::info("音频文件已保存");
 
-        // // 开始循环播放
-        // if (!capture.StartLoopback()) {
-        //     Logger::error("开始循环播放失败");
-        //     return;
-        // }
-        // Logger::info("开始循环播放成功");
-
-        // // 等待一段时间
-        // sleep(5);
-
-        // // 停止循环播放
-        // capture.StopLoopback();
-        // Logger::info("停止循环播放");
-
+        // 测试完成
         Logger::info("测试完成");
     }
 } 
