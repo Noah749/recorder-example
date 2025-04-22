@@ -26,8 +26,10 @@ public:
     void SetOutputPath(const std::string& path);
     std::string GetCurrentMicrophoneApp();
     
-    void SetMicNoiseReduction(int level);
-    void SetSpeakerNoiseReduction(int level);
+    // 设置系统音频音量
+    void SetSystemAudioVolume(float volume);
+    // 设置麦克风音量
+    void SetMicrophoneVolume(float volume);
 
 private:
     // 初始化音频会话和设备
@@ -56,12 +58,14 @@ private:
     
     // AVAudioEngine 相关
     AVAudioEngine* audioEngine_;
-    AVAudioInputNode* inputNode_;
+    AVAudioInputNode* inputNode_;  // 麦克风输入节点
+    AVAudioInputNode* systemNode_; // 系统音频输入节点
+    AVAudioMixerNode* mixerNode_;  // 混合节点
     AVAudioFormat* audioFormat_;
     
-    // 噪声消除设置
-    int micNoiseReductionLevel_;
-    int speakerNoiseReductionLevel_;
+    // 音量控制
+    float systemAudioVolume_;
+    float microphoneVolume_;
     
     // 文件写入
     AVAudioFile* audioFile_;
@@ -69,7 +73,4 @@ private:
     
     // 当前使用麦克风的应用
     std::string currentMicApp_;
-    
-    // 音频处理缓冲区
-    std::vector<Float32> processingBuffer_;
 }; 

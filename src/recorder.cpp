@@ -5,9 +5,7 @@
 // 基础实现，后续会根据平台进行具体功能实现
 AudioRecorder::AudioRecorder() 
     : isRecording_(false), 
-      isPaused_(false), 
-      micNoiseReductionLevel_(5), 
-      speakerNoiseReductionLevel_(5),
+      isPaused_(false),
       platformImpl_(nullptr) {
     // 初始化日志系统
     Logger::init();
@@ -151,34 +149,4 @@ std::string AudioRecorder::GetCurrentMicrophoneApp() {
     }
     
     return "Unknown Application";
-}
-
-void AudioRecorder::SetMicNoiseReduction(int level) {
-    if (level < 0) level = 0;
-    if (level > 10) level = 10;
-    
-    Logger::info("设置麦克风降噪级别: %d", level);
-    micNoiseReductionLevel_ = level;
-    
-    // 设置平台实现的降噪级别
-    if (platformImpl_) {
-#ifdef __APPLE__
-        platformImpl_->SetMicNoiseReduction(level);
-#endif
-    }
-}
-
-void AudioRecorder::SetSpeakerNoiseReduction(int level) {
-    if (level < 0) level = 0;
-    if (level > 10) level = 10;
-    
-    Logger::info("设置扬声器降噪级别: %d", level);
-    speakerNoiseReductionLevel_ = level;
-    
-    // 设置平台实现的降噪级别
-    if (platformImpl_) {
-#ifdef __APPLE__
-        platformImpl_->SetSpeakerNoiseReduction(level);
-#endif
-    }
 } 

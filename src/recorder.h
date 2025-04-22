@@ -1,7 +1,6 @@
 #pragma once
 
 #include <string>
-#include <atomic>
 
 // 前向声明
 class MacRecorder;
@@ -31,20 +30,12 @@ public:
     
     // 获取当前占用麦克风的应用
     std::string GetCurrentMicrophoneApp();
-    
-    // 设置麦克风降噪级别 (0-10)
-    void SetMicNoiseReduction(int level);
-    
-    // 设置扬声器降噪级别 (0-10)
-    void SetSpeakerNoiseReduction(int level);
 
 private:
+    bool isRecording_;
+    bool isPaused_;
     std::string outputPath_;
-    std::atomic<bool> isRecording_;
-    std::atomic<bool> isPaused_;
-    int micNoiseReductionLevel_;
-    int speakerNoiseReductionLevel_;
     
-    // 平台相关实现的指针
+    // 平台特定实现
     MacRecorder* platformImpl_;
 }; 

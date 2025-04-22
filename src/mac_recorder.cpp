@@ -25,16 +25,15 @@ MacRecorder::MacRecorder(AudioRecorder* recorder)
       paused_(false),
       audioEngine_(nullptr),
       inputNode_(nullptr),
+      systemNode_(nullptr),
+      mixerNode_(nullptr),
       audioFormat_(nullptr),
-      micNoiseReductionLevel_(5),
-      speakerNoiseReductionLevel_(5),
+      systemAudioVolume_(1.0f),
+      microphoneVolume_(1.0f),
       audioFile_(nullptr),
       fileOpen_(false) {
     
     Logger::debug("MacRecorder: 初始化");
-    
-    // 预分配处理缓冲区
-    processingBuffer_.resize(1024 * kChannels);
 }
 
 // 析构函数
@@ -202,16 +201,20 @@ std::string MacRecorder::GetCurrentMicrophoneApp() {
     return currentMicApp_;
 }
 
-// 设置麦克风降噪级别
-void MacRecorder::SetMicNoiseReduction(int level) {
-    Logger::debug("MacRecorder: 设置麦克风降噪级别: %d", level);
-    micNoiseReductionLevel_ = std::max(0, std::min(10, level));
+// 设置系统音频音量
+void MacRecorder::SetSystemAudioVolume(float volume) {
+    systemAudioVolume_ = std::max(0.0f, std::min(1.0f, volume));
+    if (mixerNode_) {
+        [mixerNode_ setVolume:systemAudioVolume_];
+    }
 }
 
-// 设置扬声器降噪级别
-void MacRecorder::SetSpeakerNoiseReduction(int level) {
-    Logger::debug("MacRecorder: 设置扬声器降噪级别: %d", level);
-    speakerNoiseReductionLevel_ = std::max(0, std::min(10, level));
+// 设置麦克风音量
+void MacRecorder::SetMicrophoneVolume(float volume) {
+    microphoneVolume_ = std::max(0.0f, std::min(1.0f, volume));
+    if (mixerNode_) {
+        [mixerNode_ setVolume:microphoneVolume_];
+    }
 }
 
 // 初始化音频系统
@@ -228,7 +231,21 @@ bool MacRecorder::InitializeAudio() {
     // 获取输入节点
     inputNode_ = [audioEngine_ inputNode];
     if (!inputNode_) {
-        Logger::error("MacRecorder: 获取输入节点失败");
+        Logger::error("MacRecorder: 获取麦克风输入节点失败");
+        return false;
+    }
+    
+    // 获取系统音频输入节点
+    systemNode_ = [audioEngine_ inputNode];
+    if (!systemNode_) {
+        Logger::error("MacRecorder: 获取系统音频输入节点失败");
+        return false;
+    }
+    
+    // 创建混合节点
+    mixerNode_ = [[AVAudioMixerNode alloc] init];
+    if (!mixerNode_) {
+        Logger::error("MacRecorder: 创建混合节点失败");
         return false;
     }
     
@@ -242,9 +259,20 @@ bool MacRecorder::InitializeAudio() {
         return false;
     }
     
-    // 设置输入节点回调
-    __weak MacRecorder* weakSelf = this;
-    [inputNode_ installTapOnBus:0
+    // 将节点添加到引擎
+    [audioEngine_ attachNode:mixerNode_];
+    
+    // 连接节点
+    [audioEngine_ connect:inputNode_ to:mixerNode_ format:audioFormat_];
+    [audioEngine_ connect:systemNode_ to:mixerNode_ format:audioFormat_];
+    
+    // 设置音量
+    [mixerNode_ setVolume:microphoneVolume_];
+    [mixerNode_ setVolume:systemAudioVolume_];
+    
+    // 在混合节点上安装tap来获取混合后的音频
+    MacRecorder* __weak weakSelf = this;
+    [mixerNode_ installTapOnBus:0
                      bufferSize:1024
                          format:audioFormat_
                           block:^(AVAudioPCMBuffer* buffer, AVAudioTime* when) {
@@ -265,8 +293,11 @@ void MacRecorder::CleanupAudio() {
     if (audioEngine_) {
         [audioEngine_ stop];
         [inputNode_ removeTapOnBus:0];
+        [systemNode_ removeTapOnBus:0];
         audioEngine_ = nullptr;
         inputNode_ = nullptr;
+        systemNode_ = nullptr;
+        mixerNode_ = nullptr;
         audioFormat_ = nullptr;
     }
 }
@@ -321,25 +352,6 @@ void MacRecorder::HandleAudioBuffer(AVAudioPCMBuffer* buffer) {
     }
     
     std::lock_guard<std::mutex> lock(audioMutex_);
-    
-    // 如果需要降噪处理
-    if (micNoiseReductionLevel_ > 0) {
-        float* samples = (float*)buffer.floatChannelData[0];
-        UInt32 frameCount = buffer.frameLength;
-        
-        // 确保处理缓冲区足够大
-        if (processingBuffer_.size() < frameCount) {
-            processingBuffer_.resize(frameCount);
-        }
-        
-        // 简单的阈值噪声门控 (根据降噪级别调整阈值)
-        float threshold = 0.005f * micNoiseReductionLevel_ / 10.0f;
-        for (UInt32 i = 0; i < frameCount; ++i) {
-            if (std::abs(samples[i]) < threshold) {
-                samples[i] = 0.0f;
-            }
-        }
-    }
     
     // 写入数据到文件
     WriteAudioDataToFile(buffer);

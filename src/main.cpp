@@ -20,9 +20,6 @@ int main(int argc, char* argv[]) {
         Logger::init("./logs");  // 指定日志目录
         Logger::setLevel(Logger::Level::DEBUG);
         Logger::info("启动本地录音程序");
-
-        // capture system audio
-
         // 设置默认输出路径
         std::string outputPath;
         if (argc < 2) {
