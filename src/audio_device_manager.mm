@@ -123,7 +123,7 @@ AudioObjectID AudioDeviceManager::CreateTap(NSString *name) {
     tapDescription.name = name;
     tapDescription.muteBehavior = CATapUnmuted;
     tapDescription.privateTap = NO;
-    tapDescription.exclusive = NO;
+    tapDescription.exclusive = YES;
     tapDescription.mixdown = YES;
     tapDescription.mono = NO;
 
