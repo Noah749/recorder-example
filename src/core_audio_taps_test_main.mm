@@ -13,12 +13,13 @@
 #include <vector>
 #include <string>
 
-// 全局变量
-ExtAudioFileRef audioFile = nullptr;
-AudioStreamBasicDescription outputFormat;
-AudioStreamBasicDescription inputFormat;
+// 静态变量
+static ExtAudioFileRef audioFile = nullptr;
+static AudioStreamBasicDescription outputFormat;
+static AudioStreamBasicDescription inputFormat;
 
-void AudioDataCallback(const AudioBufferList* inInputData, UInt32 inNumberFrames) {
+// 静态函数
+static void AudioDataCallback(const AudioBufferList* inInputData, UInt32 inNumberFrames) {
     if (!audioFile) {
         return;
     }
