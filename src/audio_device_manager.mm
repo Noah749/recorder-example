@@ -56,19 +56,21 @@ AudioObjectID AudioDeviceManager::CreateAggregateDevice(const char* deviceName) 
     
     const void *keys[] = {
         CFSTR(kAudioAggregateDeviceNameKey),
-        CFSTR(kAudioAggregateDeviceUIDKey)
+        CFSTR(kAudioAggregateDeviceUIDKey),
+        CFSTR(kAudioAggregateDeviceIsPrivateKey)
     };
     
     const void *values[] = {
         name,
-        uid
+        uid,
+        kCFBooleanTrue
     };
     
     CFDictionaryRef description = CFDictionaryCreate(
         kCFAllocatorDefault,
         keys,
         values,
-        2,
+        3,
         &kCFTypeDictionaryKeyCallBacks,
         &kCFTypeDictionaryValueCallBacks
     );
@@ -122,7 +124,7 @@ AudioObjectID AudioDeviceManager::CreateTap(NSString *name) {
     tapDescription.processes = [NSMutableArray array];
     tapDescription.name = name;
     tapDescription.muteBehavior = CATapUnmuted;
-    tapDescription.privateTap = NO;
+    tapDescription.privateTap = YES;
     tapDescription.exclusive = YES;
     tapDescription.mixdown = YES;
     tapDescription.mono = NO;
