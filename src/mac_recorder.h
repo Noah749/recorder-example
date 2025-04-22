@@ -5,7 +5,7 @@
 #include <thread>
 #include <mutex>
 #include <vector>
-#include <AudioToolbox/AudioToolbox.h>
+#include <AVFoundation/AVFoundation.h>
 
 // 前向声明
 class AudioRecorder;
@@ -37,20 +37,12 @@ private:
     void CleanupAudio();
     
     // 音频录制回调
-    static OSStatus RecordingCallback(void* inRefCon, 
-                                     AudioUnitRenderActionFlags* ioActionFlags,
-                                     const AudioTimeStamp* inTimeStamp,
-                                     UInt32 inBusNumber,
-                                     UInt32 inNumberFrames,
-                                     AudioBufferList* ioData);
-
-    // 实际处理音频数据的内部方法
-    OSStatus HandleRecordingCallback(UInt32 inNumberFrames);
+    void HandleAudioBuffer(AVAudioPCMBuffer* buffer);
     
     // 写入音频文件
     bool OpenAudioFile();
     void CloseAudioFile();
-    void WriteAudioDataToFile(const void* data, UInt32 numBytes);
+    void WriteAudioDataToFile(AVAudioPCMBuffer* buffer);
     
     // 获取当前使用麦克风的应用
     void UpdateCurrentMicrophoneApp();
@@ -62,22 +54,22 @@ private:
     std::atomic<bool> paused_;
     std::mutex audioMutex_;
     
-    // 音频设备和格式
-    AudioUnit audioUnit_;
-    AudioStreamBasicDescription audioFormat_;
+    // AVAudioEngine 相关
+    AVAudioEngine* audioEngine_;
+    AVAudioInputNode* inputNode_;
+    AVAudioFormat* audioFormat_;
     
     // 噪声消除设置
     int micNoiseReductionLevel_;
     int speakerNoiseReductionLevel_;
     
     // 文件写入
-    ExtAudioFileRef audioFile_;
+    AVAudioFile* audioFile_;
     bool fileOpen_;
     
     // 当前使用麦克风的应用
     std::string currentMicApp_;
     
     // 音频处理缓冲区
-    AudioBufferList* inputBuffer_;
     std::vector<Float32> processingBuffer_;
 }; 
