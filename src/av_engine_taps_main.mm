@@ -18,6 +18,7 @@
 // 全局变量
 ExtAudioFileRef audioFile = nullptr;
 AudioStreamBasicDescription outputFormat;
+AudioSystemCapture* systemCapture = nullptr;
 
 void AudioDataCallback(const AudioBufferList* inInputData, UInt32 inNumberFrames) {
     if (!audioFile) {
@@ -34,6 +35,21 @@ void AudioDataCallback(const AudioBufferList* inInputData, UInt32 inNumberFrames
 void TestAudioEngineTaps() {
     @autoreleasepool {
         Logger::info("开始测试 core audio taps");
+
+        // 创建系统音频捕获
+        systemCapture = new AudioSystemCapture();
+        if (!systemCapture) {
+            Logger::error("创建系统音频捕获失败");
+            return;
+        }
+
+        // 创建设备并设置设备 ID
+        if (!systemCapture->CreateTapDevice()) {
+            Logger::error("创建 tap 设备失败");
+            delete systemCapture;
+            systemCapture = nullptr;
+            return;
+        }
 
         // 创建音频引擎
         AVAudioEngine* audioEngine = [[AVAudioEngine alloc] init];
@@ -60,11 +76,44 @@ void TestAudioEngineTaps() {
             return;
         }
 
+        // 创建源节点
+        AVAudioSourceNode* sourceNode = [[AVAudioSourceNode alloc] initWithFormat:inputFormat renderBlock:^OSStatus(BOOL* isSilence, const AudioTimeStamp* timestamp, AVAudioFrameCount frameCount, AudioBufferList* outputData) {
+            Logger::debug("sourceNode 开始捕获音频数据: %u 帧", (unsigned int)frameCount);
+            Logger::debug("sourceNode 输出格式: 采样率=%.0f, 通道数=%u", outputData->mBuffers[0].mNumberChannels);
+            Logger::debug("sourceNode 时间戳: %p", timestamp);
+            Logger::debug("sourceNode 是否静音: %d", *isSilence);
+            if (systemCapture) {
+                // 计算需要读取的样本数
+                size_t sampleCount = frameCount * outputData->mBuffers[0].mNumberChannels;
+                
+                // 从系统捕获的缓冲区读取数据
+                if (systemCapture->ReadAudioData(static_cast<float*>(outputData->mBuffers[0].mData), sampleCount)) {
+                    *isSilence = NO;
+                } else {
+                    // 如果没有足够的数据，将输出缓冲区清零
+                    memset(outputData->mBuffers[0].mData, 0, sampleCount * sizeof(float));
+                    *isSilence = YES;
+                }
+            } else {
+                // 如果没有系统捕获，将输出缓冲区清零
+                memset(outputData->mBuffers[0].mData, 0, frameCount * sizeof(float) * outputData->mBuffers[0].mNumberChannels);
+                *isSilence = YES;
+            }
+            return noErr;
+        }];
+        
+        if (!sourceNode) {
+            Logger::error("创建源节点失败");
+            return;
+        }
+
         // 将节点添加到引擎
         [audioEngine attachNode:mixerNode];
+        [audioEngine attachNode:sourceNode];
 
         // 连接节点
         [audioEngine connect:inputNode to:mixerNode format:inputFormat];
+        [audioEngine connect:sourceNode to:mixerNode format:inputFormat];
 
         // 设置输出格式
         outputFormat.mSampleRate = inputFormat.sampleRate;  // 使用输入设备的采样率
@@ -114,6 +163,12 @@ void TestAudioEngineTaps() {
             }
         }];
 
+        // 启动系统音频捕获
+        if (!systemCapture->StartRecording()) {
+            Logger::error("启动系统音频捕获失败");
+            return;
+        }
+
         // 启动音频引擎
         NSError* error = nil;
         if (![audioEngine startAndReturnError:&error]) {
@@ -126,6 +181,11 @@ void TestAudioEngineTaps() {
 
         // 停止音频引擎
         [audioEngine stop];
+
+        // 停止系统音频捕获
+        systemCapture->StopRecording();
+        delete systemCapture;
+        systemCapture = nullptr;
 
         // 清理资源
         [mixerNode removeTapOnBus:0];

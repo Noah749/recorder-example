@@ -30,7 +30,13 @@ public:
     // 设置音频数据回调
     void SetAudioDataCallback(std::function<void(const AudioBufferList*, UInt32)> callback);
     
+    bool CreateTapDevice();
+    bool ReadAudioData(float* buffer, size_t count);
+    
 private:
+    class Impl;
+    std::unique_ptr<Impl> impl_;
+    
     // 设备属性监听回调
     static OSStatus DeviceChangedListener(
         AudioObjectID inObjectID,
