@@ -35,32 +35,13 @@ public:
     bool write(const float* data, size_t count) {
         std::unique_lock<std::mutex> lock(mutex_);
         
+        // 如果缓冲区已满，直接返回 false
         if (available_write() < count) {
-            // 如果缓冲区使用率超过 80%，进行扩容
-            if (available_read() > size_ * 0.8) {
-                size_t new_size = size_ * 2;
-                std::vector<float> new_buffer(new_size);
-                
-                // 复制现有数据到新缓冲区
-                size_t read_size = available_read();
-                for (size_t i = 0; i < read_size; ++i) {
-                    new_buffer[i] = buffer_[(read_pos_ + i) % size_];
-                }
-                
-                buffer_ = std::move(new_buffer);
-                size_ = new_size;
-                read_pos_ = 0;
-                write_pos_ = read_size;
-                
-                Logger::info("环形缓冲区扩容: %zu -> %zu", size_ / 2, size_);
-            } else {
-                // 缓冲区溢出，记录并返回 false
-                overflow_count_++;
-                if (overflow_count_ % 100 == 0) { // 每溢出100次记录一次警告
-                    Logger::error("环形缓冲区溢出次数: %zu", overflow_count_);
-                }
-                return false;
+            overflow_count_++;
+            if (overflow_count_ % 100 == 0) {
+                Logger::warn("环形缓冲区溢出次数: %zu", overflow_count_);
             }
+            return false;
         }
         
         // 写入数据
@@ -82,14 +63,20 @@ public:
     bool read(float* data, size_t count) {
         std::unique_lock<std::mutex> lock(mutex_);
         
+        // 如果数据不足，等待一段时间
         if (available_read() < count) {
-            underflow_count_++;
-            if (underflow_count_ % 100 == 0) { // 每欠载100次记录一次警告
-                Logger::error("环形缓冲区欠载次数: %zu", underflow_count_);
+            if (cv_.wait_for(lock, std::chrono::milliseconds(10), 
+                           [this, count] { return available_read() >= count; })) {
+                // 超时后仍然没有足够的数据，返回 false
+                underflow_count_++;
+                if (underflow_count_ % 100 == 0) {
+                    Logger::warn("环形缓冲区欠载次数: %zu", underflow_count_);
+                }
+                return false;
             }
-            return false;
         }
         
+        // 读取数据
         for (size_t i = 0; i < count; ++i) {
             data[i] = buffer_[read_pos_];
             read_pos_ = (read_pos_ + 1) % size_;
@@ -142,7 +129,7 @@ private:
 
 class AudioSystemCapture::Impl {
 public:
-    Impl() : ring_buffer_(44100 * 2) {} // 1秒的缓冲区
+    Impl() : ring_buffer_(352800) {} // 8秒的缓冲区
     
     RingBuffer ring_buffer_;
     AudioDeviceManager device_manager_;
@@ -391,15 +378,37 @@ OSStatus AudioSystemCapture::IOProc(
     auto* capture = static_cast<AudioSystemCapture*>(inClientData);
     
     if (inInputData != nullptr && inInputData->mNumberBuffers > 0) {
-        UInt32 numberFramesToRecord = inInputData->mBuffers[0].mDataByteSize / (inInputData->mBuffers[0].mNumberChannels * sizeof(Float32));
+        const AudioBuffer& inputBuffer = inInputData->mBuffers[0];
+        
+        // 检查输入数据是否有效
+        if (inputBuffer.mData == nullptr || inputBuffer.mDataByteSize == 0) {
+            return kAudioHardwareNoError;
+        }
+        
+        // 计算帧数
+        UInt32 bytesPerFrame = inputBuffer.mNumberChannels * sizeof(Float32);
+        UInt32 numberFrames = inputBuffer.mDataByteSize / bytesPerFrame;
+        
+        if (numberFrames == 0) {
+            return kAudioHardwareNoError;
+        }
         
         // 将音频数据写入环形缓冲区
-        float* audioData = static_cast<float*>(inInputData->mBuffers[0].mData);
-        capture->impl_->ring_buffer_.write(audioData, numberFramesToRecord * inInputData->mBuffers[0].mNumberChannels);
+        float* audioData = static_cast<float*>(inputBuffer.mData);
+        size_t sampleCount = numberFrames * inputBuffer.mNumberChannels;
+        
+        // 写入数据
+        if (!capture->impl_->ring_buffer_.write(audioData, sampleCount)) {
+            // 写入失败，可能是缓冲区已满，等待一段时间后重试
+            usleep(1000); // 1ms
+            if (!capture->impl_->ring_buffer_.write(audioData, sampleCount)) {
+                Logger::warn("写入环形缓冲区失败，丢弃数据");
+            }
+        }
         
         // 如果设置了回调函数，则调用
         if (capture->audioDataCallback_) {
-            capture->audioDataCallback_(inInputData, numberFramesToRecord);
+            capture->audioDataCallback_(inInputData, numberFrames);
         }
     }
     
@@ -456,5 +465,47 @@ bool AudioSystemCapture::CreateTapDevice() {
     
     // 设置设备ID
     SetDeviceID(newDeviceID);
+    
+    // 等待设备初始化
+    usleep(100000); // 100ms
+    
+    // 获取设备的流列表
+    AudioObjectPropertyAddress address = PropertyAddress(kAudioDevicePropertyStreams);
+    UInt32 size = 0;
+    OSStatus error = AudioObjectGetPropertyDataSize(newDeviceID, &address, 0, nullptr, &size);
+    if (error != kAudioHardwareNoError) {
+        Logger::error("获取设备流列表大小失败: %d", (int)error);
+        return false;
+    }
+    
+    std::vector<AudioObjectID> streamList(size / sizeof(AudioObjectID));
+    error = AudioObjectGetPropertyData(newDeviceID, &address, 0, nullptr, &size, streamList.data());
+    if (error != kAudioHardwareNoError) {
+        Logger::error("获取设备流列表失败: %d", (int)error);
+        return false;
+    }
+    
+    // 设置每个流的格式
+    AudioStreamBasicDescription format;
+    memset(&format, 0, sizeof(format));
+    format.mSampleRate = 44100;
+    format.mFormatID = kAudioFormatLinearPCM;
+    format.mFormatFlags = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked;
+    format.mBitsPerChannel = 32;
+    format.mChannelsPerFrame = 2;
+    format.mFramesPerPacket = 1;
+    format.mBytesPerFrame = format.mChannelsPerFrame * format.mBitsPerChannel / 8;
+    format.mBytesPerPacket = format.mBytesPerFrame;
+    
+    address = PropertyAddress(kAudioStreamPropertyVirtualFormat);
+    for (auto streamID : streamList) {
+        error = AudioObjectSetPropertyData(streamID, &address, 0, nullptr, sizeof(format), &format);
+        if (error != kAudioHardwareNoError) {
+            Logger::error("设置流 %u 格式失败: %d", (unsigned int)streamID, (int)error);
+            continue;
+        }
+        Logger::info("成功设置流 %u 的格式", (unsigned int)streamID);
+    }
+    
     return true;
 } 

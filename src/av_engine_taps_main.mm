@@ -19,22 +19,45 @@
 ExtAudioFileRef audioFile = nullptr;
 AudioStreamBasicDescription outputFormat;
 AudioSystemCapture* systemCapture = nullptr;
+dispatch_queue_t __strong audioWriteQueue = nullptr;
 
 void AudioDataCallback(const AudioBufferList* inInputData, UInt32 inNumberFrames) {
     if (!audioFile) {
         return;
     }
     
-    // 写入音频数据
-    OSStatus status = ExtAudioFileWrite(audioFile, inNumberFrames, inInputData);
-    if (status != noErr) {
-        Logger::error("写入音频数据失败: %d", (int)status);
-    }
+    // 创建音频缓冲区的副本
+    AudioBufferList* bufferListCopy = (AudioBufferList*)malloc(sizeof(AudioBufferList) + sizeof(AudioBuffer));
+    bufferListCopy->mNumberBuffers = 1;
+    bufferListCopy->mBuffers[0] = inInputData->mBuffers[0];
+    
+    // 分配数据内存并复制
+    bufferListCopy->mBuffers[0].mData = malloc(inInputData->mBuffers[0].mDataByteSize);
+    memcpy(bufferListCopy->mBuffers[0].mData, inInputData->mBuffers[0].mData, inInputData->mBuffers[0].mDataByteSize);
+    
+    // 在后台队列中写入数据
+    dispatch_async(audioWriteQueue, ^{
+        OSStatus status = ExtAudioFileWrite(audioFile, inNumberFrames, bufferListCopy);
+        if (status != noErr) {
+            Logger::error("写入音频数据失败: %d", (int)status);
+        }
+        
+        // 释放复制的内存
+        free(bufferListCopy->mBuffers[0].mData);
+        free(bufferListCopy);
+    });
 }
 
 void TestAudioEngineTaps() {
     @autoreleasepool {
         Logger::info("开始测试 core audio taps");
+
+        // 创建后台写入队列
+        audioWriteQueue = dispatch_queue_create("com.plaud.audio.write", DISPATCH_QUEUE_SERIAL);
+        if (!audioWriteQueue) {
+            Logger::error("创建写入队列失败");
+            return;
+        }
 
         // 创建系统音频捕获
         systemCapture = new AudioSystemCapture();
@@ -85,23 +108,6 @@ void TestAudioEngineTaps() {
         Logger::info("设备格式: 采样率=%.0f, 通道数=%u, 格式ID=%u, 格式标志=%u, 位深度=%u",
                     asbd.mSampleRate, asbd.mChannelsPerFrame, asbd.mFormatID, asbd.mFormatFlags, asbd.mBitsPerChannel);
 
-        // 创建音频格式
-        AVAudioFormat* standardFormat = [[AVAudioFormat alloc] initStandardFormatWithSampleRate: asbd.mSampleRate channels:asbd.mChannelsPerFrame];
-        if (!standardFormat) {
-            Logger::error("创建标准音频格式失败");
-            systemCapture->StopRecording();
-            delete systemCapture;
-            systemCapture = nullptr;
-            return;
-        }
-
-        Logger::info("标准格式: 采样率=%.0f, 通道数=%u, 格式ID=%u, 格式标志=%u, 位深度=%u",
-                    standardFormat.streamDescription->mSampleRate, 
-                    standardFormat.streamDescription->mChannelsPerFrame,
-                    standardFormat.streamDescription->mFormatID,
-                    standardFormat.streamDescription->mFormatFlags,
-                    standardFormat.streamDescription->mBitsPerChannel);
-
         // 创建音频引擎
         AVAudioEngine* audioEngine = [[AVAudioEngine alloc] init];
         if (!audioEngine) {
@@ -122,8 +128,11 @@ void TestAudioEngineTaps() {
             return;
         }
 
+        // 设置输出节点音量为0
+        [outputNode setVolume:0.0];
+
         // 创建混合节点
-        AVAudioMixerNode* mixerNode = [[AVAudioMixerNode alloc] init];
+        AVAudioMixerNode* mixerNode = [audioEngine mainMixerNode];
         if (!mixerNode) {
             Logger::error("创建混合节点失败");
             systemCapture->StopRecording();
@@ -132,32 +141,69 @@ void TestAudioEngineTaps() {
             return;
         }
 
-        // 将节点添加到引擎
-        [audioEngine attachNode:mixerNode];
+        // 使用标准格式
+        AVAudioFormat* standardFormat = [[AVAudioFormat alloc] initStandardFormatWithSampleRate: asbd.mSampleRate channels:asbd.mChannelsPerFrame];
+        if (!standardFormat) {
+            Logger::error("创建标准格式失败");
+            systemCapture->StopRecording();
+            delete systemCapture;
+            systemCapture = nullptr;
+            return;
+        }
+
+        Logger::info("标准格式: 采样率=%.0f, 通道数=%u, 格式ID=%u, 格式标志=%u, 位深度=%u",
+                    standardFormat.streamDescription->mSampleRate, 
+                    standardFormat.streamDescription->mChannelsPerFrame,
+                    standardFormat.streamDescription->mFormatID,
+                    standardFormat.streamDescription->mFormatFlags,
+                    standardFormat.streamDescription->mBitsPerChannel);
 
         // 创建源节点
         AVAudioSourceNode* sourceNode = [[AVAudioSourceNode alloc] initWithFormat:standardFormat renderBlock:^OSStatus(BOOL* isSilence, const AudioTimeStamp* timestamp, AVAudioFrameCount frameCount, AudioBufferList* outputData) {
-            Logger::debug("sourceNode 开始捕获音频数据: %u 帧", (unsigned int)frameCount);
-            Logger::debug("sourceNode 输出格式: 采样率=%.0f, 通道数=%u", outputData->mBuffers[0].mNumberChannels);
-            Logger::debug("sourceNode 时间戳: %p", timestamp);
-            Logger::debug("sourceNode 是否静音: %d", *isSilence);
-            
-            if (systemCapture) {
-                // 计算需要读取的样本数
-                size_t sampleCount = frameCount * outputData->mBuffers[0].mNumberChannels;
-                
-                // 从系统捕获的缓冲区读取数据
-                if (systemCapture->ReadAudioData(static_cast<float*>(outputData->mBuffers[0].mData), sampleCount)) {
-                    *isSilence = NO;
-                } else {
-                    // 如果没有足够的数据，将输出缓冲区清零
-                    memset(outputData->mBuffers[0].mData, 0, sampleCount * sizeof(float));
-                    *isSilence = YES;
-                }
-            } else {
-                // 如果没有系统捕获，将输出缓冲区清零
+            if (!systemCapture) {
                 memset(outputData->mBuffers[0].mData, 0, frameCount * sizeof(float) * outputData->mBuffers[0].mNumberChannels);
                 *isSilence = YES;
+                return noErr;
+            }
+
+            // 检查输出缓冲区
+            if (!outputData || !outputData->mBuffers[0].mData) {
+                Logger::error("输出缓冲区无效");
+                return kAudio_ParamError;
+            }
+
+            // 计算需要读取的样本数
+            size_t sampleCount = frameCount * outputData->mBuffers[0].mNumberChannels;
+            size_t bufferSize = sampleCount * sizeof(float);
+            
+            // 确保缓冲区大小正确
+            if (outputData->mBuffers[0].mDataByteSize < bufferSize) {
+                Logger::error("输出缓冲区大小不足: 需要 %zu 字节，实际 %u 字节", 
+                            bufferSize, outputData->mBuffers[0].mDataByteSize);
+                return kAudio_ParamError;
+            }
+
+            // 从系统捕获的缓冲区读取数据
+            bool success = systemCapture->ReadAudioData(static_cast<float*>(outputData->mBuffers[0].mData), sampleCount);
+            if (success) {
+                *isSilence = NO;
+                // 验证数据是否有效
+                float* data = static_cast<float*>(outputData->mBuffers[0].mData);
+                bool hasValidData = false;
+                for (size_t i = 0; i < sampleCount; ++i) {
+                    if (data[i] != 0.0f) {
+                        hasValidData = true;
+                        break;
+                    }
+                }
+                if (!hasValidData) {
+                    Logger::warn("读取的数据全为零");
+                }
+            } else {
+                // 如果没有足够的数据，将输出缓冲区清零
+                memset(outputData->mBuffers[0].mData, 0, bufferSize);
+                *isSilence = YES;
+                Logger::warn("没有足够的数据可读");
             }
             return noErr;
         }];
@@ -186,11 +232,11 @@ void TestAudioEngineTaps() {
 
         // 设置输出格式
         memset(&outputFormat, 0, sizeof(outputFormat));
-        outputFormat.mSampleRate = 44100;  // 使用固定的 44100 Hz 采样率
+        outputFormat.mSampleRate = 44100;
         outputFormat.mFormatID = kAudioFormatLinearPCM;
         outputFormat.mFormatFlags = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked;
         outputFormat.mBitsPerChannel = 32;
-        outputFormat.mChannelsPerFrame = 2;  // 使用固定的 2 通道
+        outputFormat.mChannelsPerFrame = 2;
         outputFormat.mFramesPerPacket = 1;
         outputFormat.mBytesPerFrame = outputFormat.mChannelsPerFrame * outputFormat.mBitsPerChannel / 8;
         outputFormat.mBytesPerPacket = outputFormat.mBytesPerFrame;
@@ -216,23 +262,29 @@ void TestAudioEngineTaps() {
 
         // 在混合节点上安装tap来获取音频
         [mixerNode installTapOnBus:0
-                        bufferSize:1024
+                        bufferSize:8192
                             format:standardFormat
                              block:^(AVAudioPCMBuffer* buffer, AVAudioTime* when) {
             if (buffer.frameLength > 0) {
-                Logger::debug("mixNode 收到音频数据: %u 帧", (unsigned int)buffer.frameLength);
+                // 创建音频缓冲区的副本
+                AudioBufferList* bufferListCopy = (AudioBufferList*)malloc(sizeof(AudioBufferList) + sizeof(AudioBuffer));
+                bufferListCopy->mNumberBuffers = 1;
+                bufferListCopy->mBuffers[0].mNumberChannels = buffer.format.channelCount;
+                bufferListCopy->mBuffers[0].mDataByteSize = buffer.frameLength * buffer.format.channelCount * sizeof(float);
+                bufferListCopy->mBuffers[0].mData = malloc(bufferListCopy->mBuffers[0].mDataByteSize);
+                memcpy(bufferListCopy->mBuffers[0].mData, buffer.floatChannelData[0], bufferListCopy->mBuffers[0].mDataByteSize);
                 
-                // 写入音频数据
-                AudioBufferList audioBufferList;
-                audioBufferList.mNumberBuffers = 1;
-                audioBufferList.mBuffers[0].mNumberChannels = buffer.format.channelCount;
-                audioBufferList.mBuffers[0].mDataByteSize = buffer.frameLength * buffer.format.channelCount * sizeof(float);
-                audioBufferList.mBuffers[0].mData = buffer.floatChannelData[0];
-                
-                OSStatus status = ExtAudioFileWrite(audioFile, buffer.frameLength, &audioBufferList);
-                if (status != noErr) {
-                    Logger::error("写入音频数据失败: %d", (int)status);
-                }
+                // 在后台队列中写入数据
+                dispatch_async(audioWriteQueue, ^{
+                    OSStatus status = ExtAudioFileWrite(audioFile, buffer.frameLength, bufferListCopy);
+                    if (status != noErr) {
+                        Logger::error("写入音频数据失败: %d", (int)status);
+                    }
+                    
+                    // 释放复制的内存
+                    free(bufferListCopy->mBuffers[0].mData);
+                    free(bufferListCopy);
+                });
             }
         }];
 
@@ -269,11 +321,11 @@ void TestAudioEngineTaps() {
             ExtAudioFileDispose(audioFile);
             audioFile = nullptr;
         }
+        audioWriteQueue = nullptr;  // ARC 会自动释放队列
         mixerNode = nil;
         audioEngine = nil;
 
         Logger::info("音频已保存到: %s", [outputPath UTF8String]);
-        // 测试完成
         Logger::info("测试完成");
     }
 } 
