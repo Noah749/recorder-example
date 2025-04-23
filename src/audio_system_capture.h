@@ -33,6 +33,24 @@ public:
     bool CreateTapDevice();
     bool ReadAudioData(float* buffer, size_t count);
     
+    // 获取设备 ID
+    AudioObjectID GetDeviceID() const { return deviceID_; }
+    
+    // 获取音频格式
+    bool GetAudioFormat(AudioStreamBasicDescription& format) {
+        if (deviceID_ == kAudioObjectUnknown) {
+            return false;
+        }
+        
+        CatalogDeviceStreams();
+        if (inputStreamList_->empty()) {
+            return false;
+        }
+        
+        format = inputStreamList_->front();
+        return true;
+    }
+    
 private:
     class Impl;
     std::unique_ptr<Impl> impl_;

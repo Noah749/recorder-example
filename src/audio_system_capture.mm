@@ -254,8 +254,11 @@ void AudioSystemCapture::CatalogDeviceStreams() {
     outputStreamList_->clear();
     
     if (deviceID_ == kAudioObjectUnknown) {
+        Logger::error("设备 ID 无效");
         return;
     }
+    
+    Logger::info("开始获取设备 %u 的流信息", (unsigned int)deviceID_);
     
     // 获取设备流列表
     UInt32 size = 0;
@@ -263,12 +266,16 @@ void AudioSystemCapture::CatalogDeviceStreams() {
     OSStatus error = AudioObjectGetPropertyDataSize(deviceID_, &address, 0, nullptr, &size);
     auto streamCount = size / sizeof(AudioObjectID);
     if (error != kAudioHardwareNoError || streamCount == 0) {
+        Logger::error("获取设备流列表失败: %d, 流数量: %zu", (int)error, streamCount);
         return;
     }
+    
+    Logger::info("设备有 %zu 个流", streamCount);
     
     std::vector<AudioObjectID> streamList(streamCount);
     error = AudioObjectGetPropertyData(deviceID_, &address, 0, nullptr, &size, streamList.data());
     if (error != kAudioHardwareNoError) {
+        Logger::error("获取设备流数据失败: %d", (int)error);
         return;
     }
     
@@ -287,11 +294,18 @@ void AudioSystemCapture::CatalogDeviceStreams() {
             AudioObjectGetPropertyData(streamID, &address, 0, nullptr, &size, &direction);
             if (direction == StreamDirection::output) {
                 outputStreamList_->push_back(format);
+                Logger::info("输出流格式: 采样率=%.0f, 通道数=%u", format.mSampleRate, format.mChannelsPerFrame);
             } else {
                 inputStreamList_->push_back(format);
+                Logger::info("输入流格式: 采样率=%.0f, 通道数=%u", format.mSampleRate, format.mChannelsPerFrame);
             }
+        } else {
+            Logger::error("获取流 %u 的格式失败: %d", (unsigned int)streamID, (int)error);
         }
     }
+    
+    Logger::info("流信息获取完成: 输入流数量=%zu, 输出流数量=%zu", 
+                inputStreamList_->size(), outputStreamList_->size());
 }
 
 bool AudioSystemCapture::StartIO() {
