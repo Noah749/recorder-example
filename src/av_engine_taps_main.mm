@@ -143,55 +143,62 @@ void TestAudioEngineTaps() {
             // Logger::info("采样率: %.0f", standardFormat.sampleRate);
             // Logger::info("通道数: %u", standardFormat.channelCount);
             // Logger::info("帧数: %u", frameCount);
-            // Logger::info("缓冲区大小: %u", outputData->mBuffers[0].mDataByteSize);
+            // Logger::info("缓冲区数量: %u", outputData->mNumberBuffers);
+            // for (UInt32 i = 0; i < outputData->mNumberBuffers; ++i) {
+            //     Logger::info("缓冲区 %u 大小: %u, 通道数: %u", 
+            //                i, outputData->mBuffers[i].mDataByteSize, 
+            //                outputData->mBuffers[i].mNumberChannels);
+            // }
             
             if (!systemCapture) {
-                memset(outputData->mBuffers[0].mData, 0, frameCount * sizeof(float) * outputData->mBuffers[0].mNumberChannels);
+                for (UInt32 i = 0; i < outputData->mNumberBuffers; ++i) {
+                    memset(outputData->mBuffers[i].mData, 0, frameCount * sizeof(float));
+                }
                 *isSilence = YES;
                 return noErr;
             }
 
             // 检查输出缓冲区
-            if (!outputData || !outputData->mBuffers[0].mData) {
+            if (!outputData || outputData->mNumberBuffers == 0) {
                 Logger::error("输出缓冲区无效");
                 return kAudio_ParamError;
             }
 
-            // 计算需要读取的样本数
-            size_t sampleCount = frameCount * outputData->mBuffers[0].mNumberChannels;
-            size_t bufferSize = sampleCount * sizeof(float);
+            // 创建临时缓冲区用于读取数据
+            float* tempBuffer = new float[frameCount * 2];  // 双通道
+            bool success = systemCapture->ReadAudioData(tempBuffer, frameCount * 2);
             
-            // 确保缓冲区大小正确
-            if (outputData->mBuffers[0].mDataByteSize < bufferSize) {
-                Logger::error("输出缓冲区大小不足: 需要 %zu 字节，实际 %u 字节", 
-                            bufferSize, outputData->mBuffers[0].mDataByteSize);
-                return kAudio_ParamError;
-            }
-
-            // 从系统捕获的缓冲区读取数据
-            bool success = systemCapture->ReadAudioData(static_cast<float*>(outputData->mBuffers[0].mData), sampleCount);
             if (success) {
                 *isSilence = NO;
+                // 将交错格式的数据复制到非交错格式的缓冲区
+                for (UInt32 i = 0; i < outputData->mNumberBuffers; ++i) {
+                    float* channelData = static_cast<float*>(outputData->mBuffers[i].mData);
+                    for (UInt32 frame = 0; frame < frameCount; ++frame) {
+                        channelData[frame] = tempBuffer[frame * 2 + i];  // 从交错格式中提取对应通道的数据
+                    }
+                }
+                
                 // 验证数据是否有效
-                float* data = static_cast<float*>(outputData->mBuffers[0].mData);
                 bool hasValidData = false;
-                for (size_t i = 0; i < sampleCount; ++i) {
-                    if (data[i] != 0.0f) {
+                for (UInt32 i = 0; i < frameCount * 2; ++i) {
+                    if (tempBuffer[i] != 0.0f) {
                         hasValidData = true;
                         break;
                     }
                 }
                 if (!hasValidData) {
                     Logger::warn("读取的数据全为零");
-                } else {
-                    // Logger::debug("成功读取 %zu 个样本，帧数: %u", sampleCount, frameCount);
                 }
             } else {
                 // 如果没有足够的数据，将输出缓冲区清零
-                memset(outputData->mBuffers[0].mData, 0, bufferSize);
+                for (UInt32 i = 0; i < outputData->mNumberBuffers; ++i) {
+                    memset(outputData->mBuffers[i].mData, 0, frameCount * sizeof(float));
+                }
                 *isSilence = YES;
-                Logger::warn("没有足够的数据可读，样本数: %zu", sampleCount);
+                Logger::warn("没有足够的数据可读，样本数: %u", frameCount * 2);
             }
+            
+            delete[] tempBuffer;
             return noErr;
         }];
 
