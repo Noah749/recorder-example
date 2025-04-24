@@ -33,7 +33,7 @@ add_executable(recorder
     src/logger.cpp
     src/mic_recorder.mm
     src/mic_recorder_main.mm
-    src/core_audio_taps_test_main.mm
+    src/system_capture_recorder_main.mm
     src/audio_device_manager.mm
     src/audio_system_capture.mm
     src/av_engine_taps_main.mm

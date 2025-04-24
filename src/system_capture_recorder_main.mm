@@ -11,11 +11,18 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include <vector>
 #include <string>
+#include <iostream>
+#include <chrono>
+#include <iomanip>
+#include <sstream>
+#include <cstdio>
+#include <unistd.h>
 
 // 静态变量
 static ExtAudioFileRef audioFile = nullptr;
 static AudioStreamBasicDescription outputFormat;
 static AudioStreamBasicDescription inputFormat;
+static std::string outputFilePath;
 
 // 静态函数
 static void AudioDataCallback(const AudioBufferList* inInputData, UInt32 inNumberFrames) {
@@ -30,9 +37,9 @@ static void AudioDataCallback(const AudioBufferList* inInputData, UInt32 inNumbe
     }
 }
 
-void TestCoreAudioTaps() {
+void TestSystemCaptureRecorder() {
     @autoreleasepool {
-        Logger::info("开始测试 core audio taps");
+        Logger::info("开始测试系统音频捕获");
 
         // 设置输出格式
         memset(&outputFormat, 0, sizeof(outputFormat));
@@ -45,14 +52,31 @@ void TestCoreAudioTaps() {
         outputFormat.mBytesPerFrame = outputFormat.mChannelsPerFrame * outputFormat.mBitsPerChannel / 8;
         outputFormat.mBytesPerPacket = outputFormat.mBytesPerFrame;
 
+        // 使用固定文件名
+        const char* filename = "system_audio.wav";
+        
+        // 获取当前工作目录
+        char cwd[PATH_MAX];
+        if (getcwd(cwd, sizeof(cwd)) != nullptr) {
+            outputFilePath = std::string(cwd) + "/" + filename;
+            printf("音频文件将保存到: %s\n", outputFilePath.c_str());
+            Logger::info("音频文件将保存到: %s", outputFilePath.c_str());
+        } else {
+            outputFilePath = filename;
+            printf("音频文件将保存到: %s\n", outputFilePath.c_str());
+            Logger::info("音频文件将保存到: %s", outputFilePath.c_str());
+        }
+        
         // 创建音频文件
+        CFStringRef filenameCF = CFStringCreateWithCString(kCFAllocatorDefault, outputFilePath.c_str(), kCFStringEncodingUTF8);
         CFURLRef fileURL = CFURLCreateWithFileSystemPath(kCFAllocatorDefault,
-                                                        CFSTR("test_audio.caf"),
+                                                        filenameCF,
                                                         kCFURLPOSIXPathStyle,
                                                         false);
+        CFRelease(filenameCF);
         
         OSStatus status = ExtAudioFileCreateWithURL(fileURL,
-                                                  kAudioFileCAFType,
+                                                  kAudioFileWAVEType,
                                                   &outputFormat,
                                                   nullptr,
                                                   kAudioFileFlags_EraseFile,
@@ -63,8 +87,7 @@ void TestCoreAudioTaps() {
             Logger::error("创建音频文件失败: %d", (int)status);
             return;
         }
-        Logger::info("创建音频文件成功");
-
+        
         AudioDeviceManager manager;
         AudioSystemCapture capture;
 
@@ -139,7 +162,8 @@ void TestCoreAudioTaps() {
         // 关闭音频文件
         ExtAudioFileDispose(audioFile);
         audioFile = nullptr;
-        Logger::info("音频文件已保存");
+        printf("音频文件已保存到: %s\n", outputFilePath.c_str());
+        Logger::info("音频文件已保存到: %s", outputFilePath.c_str());
 
         // 测试完成
         Logger::info("测试完成");

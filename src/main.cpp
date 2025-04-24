@@ -12,7 +12,7 @@
 
 // 声明测试函数
 void TestMicRecorder();
-void TestCoreAudioTaps();
+void TestSystemCaptureRecorder();
 void TestAudioEngineTaps();
 
 int main(int argc, char* argv[]) {
@@ -23,9 +23,9 @@ int main(int argc, char* argv[]) {
         Logger::info("启动本地录音程序");
         
         // 运行麦克风录音测试
-        TestMicRecorder();
+        // TestMicRecorder();
         
-        // TestCoreAudioTaps();
+        TestSystemCaptureRecorder();
         // TestAudioEngineTaps();
         
         return 0;
