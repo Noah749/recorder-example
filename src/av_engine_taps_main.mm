@@ -179,16 +179,16 @@ void TestAudioEngineTaps() {
                 }
                 
                 // 验证数据是否有效
-                bool hasValidData = false;
-                for (UInt32 i = 0; i < frameCount * 2; ++i) {
-                    if (tempBuffer[i] != 0.0f) {
-                        hasValidData = true;
-                        break;
-                    }
-                }
-                if (!hasValidData) {
-                    Logger::warn("读取的数据全为零");
-                }
+                // bool hasValidData = false;
+                // for (UInt32 i = 0; i < frameCount * 2; ++i) {
+                //     if (tempBuffer[i] != 0.0f) {
+                //         hasValidData = true;
+                //         break;
+                //     }
+                // }
+                // if (!hasValidData) {
+                //     Logger::warn("读取的数据全为零");
+                // }
             } else {
                 // 如果没有足够的数据，将输出缓冲区清零
                 for (UInt32 i = 0; i < outputData->mNumberBuffers; ++i) {
