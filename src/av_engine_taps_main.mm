@@ -73,16 +73,29 @@ void TestAudioEngineTaps() {
         // 等待一小段时间让设备初始化
         usleep(100000); // 100ms
 
+        // 获取扬声器格式
+        AudioStreamBasicDescription speakerFormat;
+        if (!systemCapture->GetAudioFormat(speakerFormat)) {
+            Logger::error("获取扬声器格式失败");
+            systemCapture->StopRecording();
+            delete systemCapture;
+            systemCapture = nullptr;
+            return;
+        }
 
-		// 使用标准格式
-		AVAudioFormat* standardFormat = [[AVAudioFormat alloc] initStandardFormatWithSampleRate:44100 channels:2];
-		if (!standardFormat) {
-			Logger::error("创建标准格式失败");
-			systemCapture->StopRecording();
-			delete systemCapture;
-			systemCapture = nullptr;
-			return;
-		}
+        Logger::info("扬声器格式: 采样率=%.0f, 通道数=%u, 格式ID=%u, 格式标志=%u, 位深度=%u",
+                    speakerFormat.mSampleRate, speakerFormat.mChannelsPerFrame, 
+                    speakerFormat.mFormatID, speakerFormat.mFormatFlags, speakerFormat.mBitsPerChannel);
+
+        // 使用标准格式（用于扬声器）
+        AVAudioFormat* standardFormat = [[AVAudioFormat alloc] initStandardFormatWithSampleRate:speakerFormat.mSampleRate channels:speakerFormat.mChannelsPerFrame];
+        if (!standardFormat) {
+            Logger::error("创建标准格式失败");
+            systemCapture->StopRecording();
+            delete systemCapture;
+            systemCapture = nullptr;
+            return;
+        }
 
         Logger::info("标准格式: 采样率=%.0f, 通道数=%u, 格式ID=%u, 格式标志=%u, 位深度=%u",
                     standardFormat.streamDescription->mSampleRate, 
@@ -114,8 +127,24 @@ void TestAudioEngineTaps() {
             return;
         }
 
-        // 创建源节点 sourceNode
+        // 获取麦克风格式
+        AVAudioInputNode* inputNode = [audioEngine inputNode];
+        AVAudioFormat* micFormat = [inputNode inputFormatForBus:0];
+        Logger::info("麦克风格式: 采样率=%.0f, 通道数=%u, 格式ID=%u, 格式标志=%u, 位深度=%u",
+                    micFormat.sampleRate, micFormat.channelCount,
+                    micFormat.streamDescription->mFormatID,
+                    micFormat.streamDescription->mFormatFlags,
+                    micFormat.streamDescription->mBitsPerChannel);
+
+        // 创建源节点 sourceNode（使用扬声器格式）
         AVAudioSourceNode* sourceNode = [[AVAudioSourceNode alloc] initWithFormat:standardFormat renderBlock:^OSStatus(BOOL* isSilence, const AudioTimeStamp* timestamp, AVAudioFrameCount frameCount, AudioBufferList* outputData) {
+            // 打印格式信息
+            // Logger::info("sourceNode 格式信息:");
+            // Logger::info("采样率: %.0f", standardFormat.sampleRate);
+            // Logger::info("通道数: %u", standardFormat.channelCount);
+            // Logger::info("帧数: %u", frameCount);
+            // Logger::info("缓冲区大小: %u", outputData->mBuffers[0].mDataByteSize);
+            
             if (!systemCapture) {
                 memset(outputData->mBuffers[0].mData, 0, frameCount * sizeof(float) * outputData->mBuffers[0].mNumberChannels);
                 *isSilence = YES;
@@ -217,17 +246,29 @@ void TestAudioEngineTaps() {
         }
 
         // 1. 创建并添加所有节点到引擎
-        AVAudioInputNode* inputNode = [audioEngine inputNode];
         AVAudioMixerNode* mixerNode = [[AVAudioMixerNode alloc] init];
         [audioEngine attachNode:sourceNode];
         [audioEngine attachNode:mixerNode];
         [audioEngine attachNode:sinkNode];
 
+        // 打印各个节点的采样率
+        Logger::info("inputNode 采样率: %.0f", [inputNode inputFormatForBus:0].sampleRate);
+        Logger::info("sourceNode 采样率: %.0f", [sourceNode outputFormatForBus:0].sampleRate);
+        Logger::info("mixerNode 采样率: %.0f", [mixerNode outputFormatForBus:0].sampleRate);
+        Logger::info("sinkNode 采样率: %.0f", [sinkNode inputFormatForBus:0].sampleRate);
+
         // 2. 连接节点
         NSError* error = nil;
+        
+        // 连接 sourceNode 到 mixerNode（使用扬声器格式）
         [audioEngine connect:sourceNode to:mixerNode format:standardFormat];
-        [audioEngine connect:inputNode to:mixerNode format:standardFormat];
-        [audioEngine connect:mixerNode to:sinkNode format:standardFormat];
+        
+        // 连接 inputNode 到 mixerNode（使用麦克风格式）
+        [audioEngine connect:inputNode to:mixerNode format:micFormat];
+        
+        // 设置 mixerNode 的输出格式为双通道
+        AVAudioFormat* mixerOutputFormat = [[AVAudioFormat alloc] initStandardFormatWithSampleRate:44100 channels:2];
+        [audioEngine connect:mixerNode to:sinkNode format:mixerOutputFormat];
 
         // 3. 设置各个节点的音量
         inputNode.volume = 0.7;
@@ -244,13 +285,14 @@ void TestAudioEngineTaps() {
         memset(&fileFormat, 0, sizeof(fileFormat));
         fileFormat.mSampleRate = standardFormat.sampleRate;
         fileFormat.mFormatID = kAudioFormatLinearPCM;
-        fileFormat.mFormatFlags = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked;  // 使用设备格式标志
+        fileFormat.mFormatFlags = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked;
         fileFormat.mBitsPerChannel = 32;
         fileFormat.mChannelsPerFrame = standardFormat.channelCount;
         fileFormat.mFramesPerPacket = 1;
-        fileFormat.mBytesPerFrame = fileFormat.mChannelsPerFrame * fileFormat.mBitsPerChannel / 8;
+        fileFormat.mBytesPerFrame = fileFormat.mChannelsPerFrame * (fileFormat.mBitsPerChannel / 8);
         fileFormat.mBytesPerPacket = fileFormat.mBytesPerFrame;
 
+        // 打印文件格式信息
         Logger::info("文件格式: 采样率=%.0f, 通道数=%u, 格式ID=%u, 格式标志=%u, 位深度=%u, 每帧字节数=%u, 每包帧数=%u",
                     fileFormat.mSampleRate,
                     fileFormat.mChannelsPerFrame,
