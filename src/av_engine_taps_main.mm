@@ -229,7 +229,9 @@ void TestAudioEngineTaps() {
         [audioEngine connect:inputNode to:mixerNode format:standardFormat];
         [audioEngine connect:mixerNode to:sinkNode format:standardFormat];
 
-        // 3. 设置 mixerNode 的参数
+        // 3. 设置各个节点的音量
+        inputNode.volume = 0.7;
+        sourceNode.volume = 0.3;
         mixerNode.outputVolume = 1.0;
 
         // 4. 创建输出文件
