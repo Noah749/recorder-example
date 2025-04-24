@@ -449,7 +449,7 @@ bool AudioSystemCapture::CreateTapDevice() {
     Logger::info("成功创建聚合设备，ID: %u", (unsigned int)newDeviceID);
     
     // 创建 tap
-    AudioObjectID tapID = impl_->device_manager_.CreateTap(@"plaud.ai tap");
+    AudioObjectID tapID = impl_->device_manager_.CreateTap("plaud.ai tap");
     if (tapID == kAudioObjectUnknown) {
         Logger::error("创建 tap 失败");
         return false;

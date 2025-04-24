@@ -38,8 +38,26 @@ static void AudioDataCallback(const AudioBufferList* inInputData, UInt32 inNumbe
 }
 
 void TestSystemCaptureRecorder() {
-    @autoreleasepool {
-        Logger::info("开始测试系统音频捕获");
+    Logger::info("开始测试系统音频捕获 - 初始化阶段");
+
+    // 初始化 AudioDeviceManager
+    try {
+        Logger::info("准备创建 AudioDeviceManager 实例...");
+        Logger::info("AudioDeviceManager 类大小: %zu", sizeof(AudioDeviceManager));
+        Logger::info("准备调用构造函数...");
+        Logger::info("当前栈指针: %p", __builtin_frame_address(0));
+        AudioDeviceManager manager;
+        Logger::info("AudioDeviceManager 实例创建完成");
+
+        // 获取所有聚合设备
+        Logger::info("准备获取聚合设备列表...");
+        auto devices = manager.GetAggregateDevices();
+        Logger::info("获取到 %zu 个聚合设备", devices.size());
+
+        // 初始化 AudioSystemCapture
+        Logger::info("准备初始化 AudioSystemCapture...");
+        AudioSystemCapture capture;
+        Logger::info("AudioSystemCapture 初始化完成");
 
         // 设置输出格式
         memset(&outputFormat, 0, sizeof(outputFormat));
@@ -88,9 +106,6 @@ void TestSystemCaptureRecorder() {
             return;
         }
         
-        AudioDeviceManager manager;
-        AudioSystemCapture capture;
-
         // 设置音频数据回调
         capture.SetAudioDataCallback(AudioDataCallback);
 
@@ -124,7 +139,7 @@ void TestSystemCaptureRecorder() {
         Logger::info("成功创建聚合设备，ID: %u", (unsigned int)deviceID);
         
         // 创建 tap
-        AudioObjectID tapID = manager.CreateTap(@"plaud.ai tap");
+        AudioObjectID tapID = manager.CreateTap("plaud.ai tap");
         if (tapID == kAudioObjectUnknown) {
             Logger::error("创建 tap 失败");
             ExtAudioFileDispose(audioFile);
@@ -167,5 +182,7 @@ void TestSystemCaptureRecorder() {
 
         // 测试完成
         Logger::info("测试完成");
+    } catch (const std::exception& e) {
+        Logger::error("测试过程中发生异常: %s", e.what());
     }
 } 

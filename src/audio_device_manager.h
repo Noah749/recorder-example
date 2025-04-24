@@ -21,7 +21,7 @@ public:
     bool RemoveAggregateDevice(AudioObjectID deviceID);
     
     // 创建 tap
-    AudioObjectID CreateTap(NSString *name);
+    AudioObjectID CreateTap(const char* name);
     
     // 删除 tap
     bool RemoveTap(AudioObjectID tapID);

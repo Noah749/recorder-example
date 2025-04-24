@@ -117,12 +117,12 @@ bool AudioDeviceManager::RemoveAggregateDevice(AudioObjectID deviceID) {
     }
 }
 
-AudioObjectID AudioDeviceManager::CreateTap(NSString *name) {
+AudioObjectID AudioDeviceManager::CreateTap(const char* name) {
     Logger::info("正在创建 CATapDescription 实例...");
     CATapDescription *tapDescription = [[CATapDescription alloc] initStereoGlobalTapButExcludeProcesses:@[]];
 
     tapDescription.processes = [NSMutableArray array];
-    tapDescription.name = name;
+    tapDescription.name = [NSString stringWithUTF8String:name];
     tapDescription.muteBehavior = CATapUnmuted;
     tapDescription.privateTap = YES;
     tapDescription.exclusive = YES;

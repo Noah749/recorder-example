@@ -13,7 +13,7 @@
 // 声明测试函数
 void TestMicRecorder();
 void TestSystemCaptureRecorder();
-void TestAudioEngineTaps();
+void TestAudioEngine();
 
 int main(int argc, char* argv[]) {
     try {
@@ -24,9 +24,10 @@ int main(int argc, char* argv[]) {
         
         // 运行麦克风录音测试
         // TestMicRecorder();
-        
+        // 运行系统音频捕获测试
         TestSystemCaptureRecorder();
-        // TestAudioEngineTaps();
+        // 运行音频引擎 测试
+        // TestAudioEngine();
         
         return 0;
     } catch (const std::exception& e) {

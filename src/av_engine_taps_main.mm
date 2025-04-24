@@ -32,9 +32,9 @@ void AudioDataCallback(const AudioBufferList* inInputData, UInt32 inNumberFrames
     }
 }
 
-void TestAudioEngineTaps() {
-    @autoreleasepool {
-        Logger::info("开始测试 core audio taps");
+void TestAudioEngine() {
+    // @autoreleasepool {
+        Logger::info("开始测试 AudioEngine 测试(麦克风混合扬声器)");
 
         // 创建系统音频捕获
         systemCapture = new AudioSystemCapture();
@@ -398,5 +398,5 @@ void TestAudioEngineTaps() {
 
         Logger::info("音频已保存到: %s", [outputPath UTF8String]);
         Logger::info("测试完成");
-    }
+    // }
 } 
