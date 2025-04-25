@@ -1,5 +1,5 @@
 {
-  "name": "meeting-recorder",
+  "name": "recorder",
   "version": "0.1.0",
   "description": "跨平台会议自动录制工具",
   "main": "index.js",

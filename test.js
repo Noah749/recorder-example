@@ -1,37 +1,54 @@
 'use strict';
 
-// 引入录制模块 (使用相对路径)
-const recorder = require('./');
+const { Recorder } = require('./build/Release/recorder');
 
-console.log('开始测试...');
-
-// try {
-//     // 测试麦克风录制
-//     console.log('开始测试麦克风录音...');
-//     console.log('调用 testMicRecorder() 前');
-//     recorder.testMicRecorder();
-//     console.log('调用 testMicRecorder() 后');
-// } catch (error) {
-//     console.error('麦克风录音测试失败:', error);
-//     console.error('错误堆栈:', error.stack);
-// }
-
-// 测试系统音频捕获
-try {
-    console.log('开始测试系统音频捕获...');
-    recorder.testSystemCaptureRecorder();
-    console.log('系统音频捕获测试完成');
-} catch (error) {
-    console.error('系统音频捕获测试失败:', error);
+async function testRecorder() {
+    console.log('开始测试录音功能...');
+    
+    const recorder = new Recorder();
+    
+    try {
+        // 设置输出路径
+        recorder.setOutputPath('./test_output.wav');
+        
+        // 开始录音
+        console.log('开始录音...');
+        const success = recorder.start();
+        if (!success) {
+            throw new Error('启动录音失败');
+        }
+        
+        // 获取当前使用麦克风的应用
+        console.log('当前使用麦克风的应用:', recorder.getCurrentMicrophoneApp());
+        
+        // 等待5秒
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        
+        // 暂停录音
+        console.log('暂停录音...');
+        recorder.pause();
+        
+        // 等待2秒
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // 恢复录音
+        console.log('恢复录音...');
+        recorder.resume();
+        
+        // 等待3秒
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        // 停止录音
+        console.log('停止录音...');
+        recorder.stop();
+        
+        // 检查录音状态
+        console.log('录音状态:', recorder.isRecording() ? '正在录音' : '已停止');
+        
+        console.log('测试完成');
+    } catch (error) {
+        console.error('测试过程中发生错误:', error);
+    }
 }
 
-// 测试音频引擎
-// try {
-//     console.log('开始测试音频引擎...');
-//     recorder.testAudioEngine();
-//     console.log('音频引擎测试完成');
-// } catch (error) {
-//     console.error('音频引擎测试失败:', error);
-// }
-
-console.log('测试结束');
+testRecorder().catch(console.error);

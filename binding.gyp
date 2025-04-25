@@ -1,27 +1,35 @@
 {
   "targets": [
     {
-      "target_name": "meeting_recorder",
+      "target_name": "recorder",
       "cflags!": [ "-fno-exceptions" ],
       "cflags_cc!": [ "-fno-exceptions" ],
       "sources": [ 
         "src/recorder.cpp",
-        "src/logger.cpp",
+        "src/recorder.h",
         "src/mac_recorder.cpp",
-        "src/mic_recorder.mm",
-        "src/mic_recorder_main.mm",
-        "src/system_capture_recorder_main.mm",
+        "src/mac_recorder.h",
+        "src/audio_system_capture.mm",
+        "src/audio_system_capture.h",
+        "src/audio_device_manager.mm",
+        "src/audio_device_manager.h",
+        "src/logger.cpp",
+        "src/logger.h",
+        "src/ring_buffer.cpp",
+        "src/ring_buffer.h",
         "src/nodejs/recorder_bindings.cpp"
       ],
       "include_dirs": [
         "<!@(node -p \"require('node-addon-api').include\")",
         "<!@(node -p \"require('node-addon-api').include_dir\")",
         "<!@(node -p \"require('node-addon-api').node_root_dir\")",
-        "./deps/spdlog-1.12.0/include",
+        "./include",
         "./src",
-        "./src/nodejs"
+        "./src/nodejs",
+        "./deps/spdlog-1.12.0/include"
       ],
       "defines": [
+        "NAPI_DISABLE_CPP_EXCEPTIONS",
         "SPDLOG_HEADER_ONLY"
       ],
       "conditions": [
@@ -37,23 +45,10 @@
             "libraries": [
               "-framework CoreAudio",
               "-framework AudioToolbox",
-              "-framework AudioUnit",
               "-framework CoreFoundation",
-              "-framework CoreServices",
               "-framework AVFoundation",
               "-framework Foundation"
             ]
-          }
-        }],
-        ["OS=='win'", {
-          "libraries": [
-            "-lwinmm.lib",
-            "-lole32.lib"
-          ],
-          "msvs_settings": {
-            "VCCLCompilerTool": {
-              "ExceptionHandling": 1
-            }
           }
         }]
       ],

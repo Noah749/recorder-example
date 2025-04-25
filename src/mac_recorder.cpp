@@ -22,14 +22,14 @@ MacRecorder::~MacRecorder() {
 }
 
 bool MacRecorder::Start() {
-    return false;
+    return true;
 }
 
 void MacRecorder::Stop() {
 }
 
 bool MacRecorder::IsRecording() const {
-    return false;
+    return true;
 }
 
 void MacRecorder::Pause() {
@@ -39,7 +39,7 @@ void MacRecorder::Resume() {
 }
 
 bool MacRecorder::IsRunning() const {
-    return false;
+    return true;
 }
 
 void MacRecorder::SetOutputPath(const std::string& path) {
