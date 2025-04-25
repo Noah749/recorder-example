@@ -25,9 +25,9 @@ int main(int argc, char* argv[]) {
         // 运行麦克风录音测试
         // TestMicRecorder();
         // 运行系统音频捕获测试
-        TestSystemCaptureRecorder();
+        // TestSystemCaptureRecorder();
         // 运行音频引擎 测试
-        // TestAudioEngine();
+        TestAudioEngine();
         
         return 0;
     } catch (const std::exception& e) {

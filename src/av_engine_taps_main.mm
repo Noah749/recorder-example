@@ -277,8 +277,8 @@ void TestAudioEngine() {
         [audioEngine connect:mixerNode to:sinkNode format:mixerOutputFormat];
 
         // 3. 设置各个节点的音量
-        inputNode.volume = 0.6;
-        sourceNode.volume = 0.4;
+        inputNode.volume = 0.7;
+        sourceNode.volume = 0.3;
         mixerNode.outputVolume = 1.0;
 
         // 4. 创建输出文件
@@ -370,7 +370,6 @@ void TestAudioEngine() {
             systemCapture = nullptr;
             return;
         }
-
         // 等待一段时间
         sleep(5);
 

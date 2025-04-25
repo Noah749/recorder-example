@@ -113,6 +113,15 @@ public:
         };
     }
     
+    void clear() {
+        std::unique_lock<std::mutex> lock(mutex_);
+        read_pos_ = 0;
+        write_pos_ = 0;
+        overflow_count_ = 0;
+        underflow_count_ = 0;
+        max_used_size_ = 0;
+    }
+    
 private:
     std::vector<float> buffer_;
     size_t read_pos_;
@@ -418,6 +427,10 @@ OSStatus AudioSystemCapture::IOProc(
 // 添加新方法用于从环形缓冲区读取数据
 bool AudioSystemCapture::ReadAudioData(float* buffer, size_t count) {
     return impl_->ring_buffer_.read(buffer, count);
+}
+
+void AudioSystemCapture::ClearRingBuffer() {
+    impl_->ring_buffer_.clear();
 }
 
 bool AudioSystemCapture::CreateTapDevice() {

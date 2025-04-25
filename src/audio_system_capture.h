@@ -36,6 +36,9 @@ public:
     // 获取设备 ID
     AudioObjectID GetDeviceID() const { return deviceID_; }
     
+    // 清理环形缓冲区
+    void ClearRingBuffer();
+    
     // 获取音频格式
     bool GetAudioFormat(AudioStreamBasicDescription& format) {
         if (deviceID_ == kAudioObjectUnknown) {
