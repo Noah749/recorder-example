@@ -1,7 +1,7 @@
 'use strict';
 
 // 引入已安装的会议录制模块
-const recorder = require('meeting-recorder');
+const recorder = require('recorder');
 
 console.log('测试已安装的会议录制模块');
 
