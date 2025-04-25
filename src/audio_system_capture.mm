@@ -39,7 +39,6 @@ public:
         if (available_write() < count) {
             overflow_count_++;
             if (overflow_count_ % 100 == 0) {
-                Logger::warn("环形缓冲区溢出次数: %zu", overflow_count_);
             }
             return false;
         }
@@ -70,7 +69,6 @@ public:
                 // 超时后仍然没有足够的数据，返回 false
                 underflow_count_++;
                 if (underflow_count_ % 100 == 0) {
-                    Logger::warn("环形缓冲区欠载次数: %zu", underflow_count_);
                 }
                 return false;
             }
@@ -254,8 +252,6 @@ void AudioSystemCapture::CatalogDeviceStreams() {
         return;
     }
     
-    Logger::info("开始获取设备 %u 的流信息", (unsigned int)deviceID_);
-    
     // 获取设备流列表
     UInt32 size = 0;
     AudioObjectPropertyAddress address = PropertyAddress(kAudioDevicePropertyStreams);
@@ -265,8 +261,6 @@ void AudioSystemCapture::CatalogDeviceStreams() {
         Logger::error("获取设备流列表失败: %d, 流数量: %zu", (int)error, streamCount);
         return;
     }
-    
-    Logger::info("设备有 %zu 个流", streamCount);
     
     std::vector<AudioObjectID> streamList(streamCount);
     error = AudioObjectGetPropertyData(deviceID_, &address, 0, nullptr, &size, streamList.data());
@@ -290,22 +284,16 @@ void AudioSystemCapture::CatalogDeviceStreams() {
             AudioObjectGetPropertyData(streamID, &address, 0, nullptr, &size, &direction);
             if (direction == StreamDirection::output) {
                 outputStreamList_->push_back(format);
-                Logger::info("输出流格式: 采样率=%.0f, 通道数=%u", format.mSampleRate, format.mChannelsPerFrame);
             } else {
                 inputStreamList_->push_back(format);
-                Logger::info("输入流格式: 采样率=%.0f, 通道数=%u", format.mSampleRate, format.mChannelsPerFrame);
             }
         } else {
             Logger::error("获取流 %u 的格式失败: %d", (unsigned int)streamID, (int)error);
         }
     }
-    
-    Logger::info("流信息获取完成: 输入流数量=%zu, 输出流数量=%zu", 
-                inputStreamList_->size(), outputStreamList_->size());
 }
 
 bool AudioSystemCapture::StartIO() {
-    Logger::info("开始IO");
     AudioDeviceIOProcID ioProcID = nullptr;
     auto error = AudioDeviceCreateIOProcID(deviceID_, IOProc, this, &ioProcID);
     if (error != kAudioHardwareNoError) {
@@ -323,12 +311,19 @@ bool AudioSystemCapture::StartIO() {
 }
 
 void AudioSystemCapture::StopIO() {
-    Logger::info("停止IO");
+    static bool isStopping = false;
+    if (isStopping) {
+        return;
+    }
+    isStopping = true;
+    
     if (ioProcID_) {
         AudioDeviceStop(deviceID_, ioProcID_);
         AudioDeviceDestroyIOProcID(deviceID_, ioProcID_);
         ioProcID_ = nullptr;
     }
+    
+    isStopping = false;
 }
 
 void AudioSystemCapture::RegisterListeners() {
@@ -436,22 +431,16 @@ void AudioSystemCapture::ClearRingBuffer() {
 bool AudioSystemCapture::CreateTapDevice() {
     // 查找并删除指定名称的设备
     auto devicesToRemove = impl_->device_manager_.GetAggregateDevicesByName("plaud.ai Aggregate Audio Device");
-    Logger::info("找到 %zu 个需要删除的聚合设备", devicesToRemove.size());
-    
     for (const auto& deviceID : devicesToRemove) {
         auto taps = impl_->device_manager_.GetDeviceTaps(deviceID);
-        Logger::info("设备 %u 有 %zu 个 tap", (unsigned int)deviceID, taps.size());
         for (const auto& tap : taps) {
-            Logger::info("正在删除 tap %u", (unsigned int)tap);
             impl_->device_manager_.RemoveTap(tap);
         }
-        Logger::info("正在删除设备 %u", (unsigned int)deviceID);
         impl_->device_manager_.RemoveAggregateDevice(deviceID);
     }
     
     // 验证设备是否已删除
     auto remainingDevices = impl_->device_manager_.GetAggregateDevicesByName("plaud.ai Aggregate Audio Device");
-    Logger::info("删除后剩余 %zu 个聚合设备", remainingDevices.size());
     
     // 创建新的聚合设备
     AudioObjectID newDeviceID = impl_->device_manager_.CreateAggregateDevice("plaud.ai Aggregate Audio Device");
@@ -459,7 +448,6 @@ bool AudioSystemCapture::CreateTapDevice() {
         Logger::error("创建聚合设备失败");
         return false;
     }
-    Logger::info("成功创建聚合设备，ID: %u", (unsigned int)newDeviceID);
     
     // 创建 tap
     AudioObjectID tapID = impl_->device_manager_.CreateTap("plaud.ai tap");
@@ -467,14 +455,12 @@ bool AudioSystemCapture::CreateTapDevice() {
         Logger::error("创建 tap 失败");
         return false;
     }
-    Logger::info("成功创建 tap，ID: %u", (unsigned int)tapID);
     
     // 添加 tap 到设备
     if (!impl_->device_manager_.AddTapToDevice(tapID, newDeviceID)) {
         Logger::error("添加 tap 到设备失败");
         return false;
     }
-    Logger::info("成功将 tap 添加到设备");
     
     // 设置设备ID
     SetDeviceID(newDeviceID);
@@ -517,7 +503,6 @@ bool AudioSystemCapture::CreateTapDevice() {
             Logger::error("设置流 %u 格式失败: %d", (unsigned int)streamID, (int)error);
             continue;
         }
-        Logger::info("成功设置流 %u 的格式", (unsigned int)streamID);
     }
     
     return true;

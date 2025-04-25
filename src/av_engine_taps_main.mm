@@ -34,8 +34,6 @@ void AudioDataCallback(const AudioBufferList* inInputData, UInt32 inNumberFrames
 
 void TestAudioEngine() {
     // @autoreleasepool {
-        Logger::info("开始测试 AudioEngine 测试(麦克风混合扬声器)");
-
         // 创建系统音频捕获
         systemCapture = new AudioSystemCapture();
         if (!systemCapture) {
@@ -59,7 +57,6 @@ void TestAudioEngine() {
             systemCapture = nullptr;
             return;
         }
-        Logger::info("设备 ID: %u", (unsigned int)deviceID);
 
         // 启动系统音频捕获以获取格式信息
         if (!systemCapture->StartRecording()) {
@@ -82,10 +79,6 @@ void TestAudioEngine() {
             return;
         }
 
-        Logger::info("扬声器格式: 采样率=%.0f, 通道数=%u, 格式ID=%u, 格式标志=%u, 位深度=%u",
-                    speakerFormat.mSampleRate, speakerFormat.mChannelsPerFrame, 
-                    speakerFormat.mFormatID, speakerFormat.mFormatFlags, speakerFormat.mBitsPerChannel);
-
         // 使用标准格式（用于扬声器）
         AVAudioFormat* standardFormat = [[AVAudioFormat alloc] initStandardFormatWithSampleRate:speakerFormat.mSampleRate channels:speakerFormat.mChannelsPerFrame];
         if (!standardFormat) {
@@ -96,13 +89,6 @@ void TestAudioEngine() {
             return;
         }
 
-        Logger::info("标准格式: 采样率=%.0f, 通道数=%u, 格式ID=%u, 格式标志=%u, 位深度=%u",
-                    standardFormat.streamDescription->mSampleRate, 
-                    standardFormat.streamDescription->mChannelsPerFrame,
-                    standardFormat.streamDescription->mFormatID,
-                    standardFormat.streamDescription->mFormatFlags,
-                    standardFormat.streamDescription->mBitsPerChannel);
-
         // 获取音频格式
         AudioStreamBasicDescription asbd;
         if (!systemCapture->GetAudioFormat(asbd)) {
@@ -112,9 +98,6 @@ void TestAudioEngine() {
             systemCapture = nullptr;
             return;
         }
-
-        Logger::info("设备格式: 采样率=%.0f, 通道数=%u, 格式ID=%u, 格式标志=%u, 位深度=%u",
-                    asbd.mSampleRate, asbd.mChannelsPerFrame, asbd.mFormatID, asbd.mFormatFlags, asbd.mBitsPerChannel);
 
         // 创建音频引擎
         AVAudioEngine* audioEngine = [[AVAudioEngine alloc] init];
@@ -129,26 +112,9 @@ void TestAudioEngine() {
         // 获取麦克风格式
         AVAudioInputNode* inputNode = [audioEngine inputNode];
         AVAudioFormat* micFormat = [inputNode inputFormatForBus:0];
-        Logger::info("麦克风格式: 采样率=%.0f, 通道数=%u, 格式ID=%u, 格式标志=%u, 位深度=%u",
-                    micFormat.sampleRate, micFormat.channelCount,
-                    micFormat.streamDescription->mFormatID,
-                    micFormat.streamDescription->mFormatFlags,
-                    micFormat.streamDescription->mBitsPerChannel);
 
         // 创建源节点 sourceNode（使用扬声器格式）
         AVAudioSourceNode* sourceNode = [[AVAudioSourceNode alloc] initWithFormat:standardFormat renderBlock:^OSStatus(BOOL* isSilence, const AudioTimeStamp* timestamp, AVAudioFrameCount frameCount, AudioBufferList* outputData) {
-            // 打印格式信息
-            // Logger::info("sourceNode 格式信息:");
-            // Logger::info("采样率: %.0f", standardFormat.sampleRate);
-            // Logger::info("通道数: %u", standardFormat.channelCount);
-            // Logger::info("帧数: %u", frameCount);
-            // Logger::info("缓冲区数量: %u", outputData->mNumberBuffers);
-            // for (UInt32 i = 0; i < outputData->mNumberBuffers; ++i) {
-            //     Logger::info("缓冲区 %u 大小: %u, 通道数: %u", 
-            //                i, outputData->mBuffers[i].mDataByteSize, 
-            //                outputData->mBuffers[i].mNumberChannels);
-            // }
-            
             if (!systemCapture) {
                 for (UInt32 i = 0; i < outputData->mNumberBuffers; ++i) {
                     memset(outputData->mBuffers[i].mData, 0, frameCount * sizeof(float));
@@ -169,32 +135,17 @@ void TestAudioEngine() {
             
             if (success) {
                 *isSilence = NO;
-                // 将交错格式的数据复制到非交错格式的缓冲区
                 for (UInt32 i = 0; i < outputData->mNumberBuffers; ++i) {
                     float* channelData = static_cast<float*>(outputData->mBuffers[i].mData);
                     for (UInt32 frame = 0; frame < frameCount; ++frame) {
-                        channelData[frame] = tempBuffer[frame * 2 + i];  // 从交错格式中提取对应通道的数据
+                        channelData[frame] = tempBuffer[frame * 2 + i];
                     }
                 }
-                
-                // 验证数据是否有效
-                // bool hasValidData = false;
-                // for (UInt32 i = 0; i < frameCount * 2; ++i) {
-                //     if (tempBuffer[i] != 0.0f) {
-                //         hasValidData = true;
-                //         break;
-                //     }
-                // }
-                // if (!hasValidData) {
-                //     Logger::warn("读取的数据全为零");
-                // }
             } else {
-                // 如果没有足够的数据，将输出缓冲区清零
                 for (UInt32 i = 0; i < outputData->mNumberBuffers; ++i) {
                     memset(outputData->mBuffers[i].mData, 0, frameCount * sizeof(float));
                 }
                 *isSilence = YES;
-                Logger::warn("没有足够的数据可读，样本数: %u", frameCount * 2);
             }
             
             delete[] tempBuffer;
@@ -207,14 +158,12 @@ void TestAudioEngine() {
                                                                                    const AudioBufferList* outputData) {
             // 这里写入音频文件
             if (audioFile) {
-                // 创建交错格式的缓冲区
                 AudioBufferList interleavedBufferList;
                 interleavedBufferList.mNumberBuffers = 1;
                 interleavedBufferList.mBuffers[0].mNumberChannels = outputData->mNumberBuffers;
                 interleavedBufferList.mBuffers[0].mDataByteSize = frameCount * sizeof(float) * outputData->mNumberBuffers;
                 interleavedBufferList.mBuffers[0].mData = malloc(interleavedBufferList.mBuffers[0].mDataByteSize);
-                
-                // 将非交错格式转换为交错格式
+
                 float* interleavedData = (float*)interleavedBufferList.mBuffers[0].mData;
                 for (UInt32 frame = 0; frame < frameCount; ++frame) {
                     for (UInt32 channel = 0; channel < outputData->mNumberBuffers; ++channel) {
@@ -223,33 +172,15 @@ void TestAudioEngine() {
                     }
                 }
                 
-                // 写入交错格式的数据
                 OSStatus status = ExtAudioFileWrite(audioFile, frameCount, &interleavedBufferList);
                 if (status != noErr) {
                     Logger::error("写入音频数据失败: %d", (int)status);
                 }
                 
-                // 释放临时缓冲区
                 free(interleavedBufferList.mBuffers[0].mData);
             }
             return noErr;
         }];
-
-        // 打印 sinkNode 输入流格式
-        AVAudioFormat* sinkInputFormat = [sinkNode inputFormatForBus:0];
-        if (sinkInputFormat) {
-            const AudioStreamBasicDescription* asbd = sinkInputFormat.streamDescription;
-            Logger::info("sinkNode 输入流格式: 采样率=%.0f, 通道数=%u, 格式ID=%u, 格式标志=%u, 位深度=%u, 每帧字节数=%u, 每包帧数=%u",
-                        asbd->mSampleRate,
-                        asbd->mChannelsPerFrame,
-                        asbd->mFormatID,
-                        asbd->mFormatFlags,
-                        asbd->mBitsPerChannel,
-                        asbd->mBytesPerFrame,
-                        asbd->mFramesPerPacket);
-        } else {
-            Logger::error("无法获取 sinkNode 输入流格式");
-        }
 
         // 1. 创建并添加所有节点到引擎
         AVAudioMixerNode* mixerNode = [[AVAudioMixerNode alloc] init];
@@ -257,26 +188,16 @@ void TestAudioEngine() {
         [audioEngine attachNode:mixerNode];
         [audioEngine attachNode:sinkNode];
 
-        // 打印各个节点的采样率
-        Logger::info("inputNode 采样率: %.0f", [inputNode inputFormatForBus:0].sampleRate);
-        Logger::info("sourceNode 采样率: %.0f", [sourceNode outputFormatForBus:0].sampleRate);
-        Logger::info("mixerNode 采样率: %.0f", [mixerNode outputFormatForBus:0].sampleRate);
-        Logger::info("sinkNode 采样率: %.0f", [sinkNode inputFormatForBus:0].sampleRate);
-
         // 2. 连接节点
         NSError* error = nil;
         
-        // 连接 sourceNode 到 mixerNode（使用扬声器格式）
         [audioEngine connect:sourceNode to:mixerNode format:standardFormat];
         
-        // 连接 inputNode 到 mixerNode（使用麦克风格式）
         [audioEngine connect:inputNode to:mixerNode format:micFormat];
         
-        // 设置 mixerNode 的输出格式为双通道
         AVAudioFormat* mixerOutputFormat = [[AVAudioFormat alloc] initStandardFormatWithSampleRate:44100 channels:2];
         [audioEngine connect:mixerNode to:sinkNode format:mixerOutputFormat];
 
-        // 3. 设置各个节点的音量
         inputNode.volume = 0.7;
         sourceNode.volume = 0.3;
         mixerNode.outputVolume = 1.0;
@@ -286,7 +207,6 @@ void TestAudioEngine() {
         NSString* outputPath = [currentDir stringByAppendingPathComponent:@"source_audio.wav"];
         NSURL* outputURL = [NSURL fileURLWithPath:outputPath];
 
-        // 设置文件输出格式
         AudioStreamBasicDescription fileFormat;
         memset(&fileFormat, 0, sizeof(fileFormat));
         fileFormat.mSampleRate = standardFormat.sampleRate;
@@ -297,16 +217,6 @@ void TestAudioEngine() {
         fileFormat.mFramesPerPacket = 1;
         fileFormat.mBytesPerFrame = fileFormat.mChannelsPerFrame * (fileFormat.mBitsPerChannel / 8);
         fileFormat.mBytesPerPacket = fileFormat.mBytesPerFrame;
-
-        // 打印文件格式信息
-        Logger::info("文件格式: 采样率=%.0f, 通道数=%u, 格式ID=%u, 格式标志=%u, 位深度=%u, 每帧字节数=%u, 每包帧数=%u",
-                    fileFormat.mSampleRate,
-                    fileFormat.mChannelsPerFrame,
-                    fileFormat.mFormatID,
-                    fileFormat.mFormatFlags,
-                    fileFormat.mBitsPerChannel,
-                    fileFormat.mBytesPerFrame,
-                    fileFormat.mFramesPerPacket);
 
         // 创建音频文件
         OSStatus status = ExtAudioFileCreateWithURL((__bridge CFURLRef)outputURL,
@@ -323,7 +233,6 @@ void TestAudioEngine() {
             return;
         }
 
-        // 设置音频文件的客户端格式
         status = ExtAudioFileSetProperty(audioFile,
                                        kExtAudioFileProperty_ClientDataFormat,
                                        sizeof(fileFormat),
@@ -337,25 +246,6 @@ void TestAudioEngine() {
             systemCapture = nullptr;
             return;
         }
-
-        // 获取并打印实际的文件格式
-        UInt32 propertySize = sizeof(fileFormat);
-        status = ExtAudioFileGetProperty(audioFile,
-                                       kExtAudioFileProperty_FileDataFormat,
-                                       &propertySize,
-                                       &fileFormat);
-        if (status == noErr) {
-            Logger::info("实际文件格式: 采样率=%.0f, 通道数=%u, 格式ID=%u, 格式标志=%u, 位深度=%u, 每帧字节数=%u, 每包帧数=%u",
-                        fileFormat.mSampleRate,
-                        fileFormat.mChannelsPerFrame,
-                        fileFormat.mFormatID,
-                        fileFormat.mFormatFlags,
-                        fileFormat.mBitsPerChannel,
-                        fileFormat.mBytesPerFrame,
-                        fileFormat.mFramesPerPacket);
-        }
-
-        Logger::info("start engine");
 
         // 启动音频引擎
         if (![audioEngine startAndReturnError:&error]) {
@@ -386,8 +276,6 @@ void TestAudioEngine() {
             OSStatus status = ExtAudioFileDispose(audioFile);
             if (status != noErr) {
                 Logger::error("关闭 tap 音频文件失败: %d", (int)status);
-            } else {
-                Logger::info("tap 音频文件已关闭");
             }
             audioFile = nullptr;
         }
@@ -396,6 +284,5 @@ void TestAudioEngine() {
         audioEngine = nil;
 
         Logger::info("音频已保存到: %s", [outputPath UTF8String]);
-        Logger::info("测试完成");
     // }
 } 

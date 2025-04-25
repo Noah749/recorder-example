@@ -45,14 +45,9 @@ std::vector<AudioObjectID> AudioDeviceManager::GetAggregateDevices() {
 }
 
 AudioObjectID AudioDeviceManager::CreateAggregateDevice(const char* deviceName) {
-    Logger::info("开始创建聚合设备...");
-    
     CFStringRef name = CFStringCreateWithCString(kCFAllocatorDefault, deviceName, kCFStringEncodingUTF8);
     CFUUIDRef uuid = CFUUIDCreate(kCFAllocatorDefault);
     CFStringRef uid = CFUUIDCreateString(kCFAllocatorDefault, uuid);
-    
-    Logger::info("设备名称: %s", [(__bridge NSString *)name UTF8String]);
-    Logger::info("设备 UID: %s", [(__bridge NSString *)uid UTF8String]);
     
     const void *keys[] = {
         CFSTR(kAudioAggregateDeviceNameKey),
@@ -83,12 +78,10 @@ AudioObjectID AudioDeviceManager::CreateAggregateDevice(const char* deviceName) 
         return kAudioObjectUnknown;
     }
     
-    Logger::info("正在创建聚合设备...");
     AudioObjectID aggregateDeviceID = 0;
     OSStatus status = AudioHardwareCreateAggregateDevice(description, &aggregateDeviceID);
     
     if (status == noErr) {
-        Logger::info("聚合设备创建成功，ID: %u", aggregateDeviceID);
     } else {
         Logger::error("聚合设备创建失败，错误码: %d", (int)status);
         char errorString[5] = {0};
@@ -102,14 +95,12 @@ AudioObjectID AudioDeviceManager::CreateAggregateDevice(const char* deviceName) 
     CFRelease(uid);
     CFRelease(uuid);
     
-    Logger::info("聚合设备创建过程完成");
     return aggregateDeviceID;
 }
 
 bool AudioDeviceManager::RemoveAggregateDevice(AudioObjectID deviceID) {
     OSStatus status = AudioHardwareDestroyAggregateDevice(deviceID);
     if (status == noErr) {
-        Logger::info("成功删除聚合设备 ID: %u", (unsigned int)deviceID);
         return true;
     } else {
         Logger::error("删除聚合设备失败，错误码: %d", (int)status);
@@ -118,7 +109,6 @@ bool AudioDeviceManager::RemoveAggregateDevice(AudioObjectID deviceID) {
 }
 
 AudioObjectID AudioDeviceManager::CreateTap(const char* name) {
-    Logger::info("正在创建 CATapDescription 实例...");
     CATapDescription *tapDescription = [[CATapDescription alloc] initStereoGlobalTapButExcludeProcesses:@[]];
 
     tapDescription.processes = [NSMutableArray array];
@@ -129,7 +119,6 @@ AudioObjectID AudioDeviceManager::CreateTap(const char* name) {
     tapDescription.mixdown = YES;
     tapDescription.mono = NO;
 
-    Logger::info("正在创建音频捕获 tap...");
     AudioObjectID tapID = AudioObjectID(kAudioObjectUnknown);
     OSStatus status = AudioHardwareCreateProcessTap(tapDescription, &tapID);
     
@@ -138,14 +127,12 @@ AudioObjectID AudioDeviceManager::CreateTap(const char* name) {
         return kAudioObjectUnknown;
     }
     
-    Logger::info("音频捕获 tap 创建成功，ID: %u", tapID);
     return tapID;
 }
 
 bool AudioDeviceManager::RemoveTap(AudioObjectID tapID) {
     OSStatus status = AudioHardwareDestroyProcessTap(tapID);
     if (status == noErr) {
-        Logger::info("成功删除 tap ID: %u", (unsigned int)tapID);
         return true;
     } else {
         Logger::error("删除 tap 失败，错误码: %d", (int)status);
@@ -156,7 +143,6 @@ bool AudioDeviceManager::RemoveTap(AudioObjectID tapID) {
 bool AudioDeviceManager::AddTapToDevice(AudioObjectID tapID, AudioObjectID deviceID) {
     OSStatus status;
     
-    // 获取 tap 的 UID
     AudioObjectPropertyAddress propertyAddress = {
         kAudioTapPropertyUID,
         kAudioObjectPropertyScopeGlobal,
@@ -172,7 +158,6 @@ bool AudioDeviceManager::AddTapToDevice(AudioObjectID tapID, AudioObjectID devic
         return false;
     }
     
-    // 获取当前的 tap 列表
     propertyAddress.mSelector = kAudioAggregateDevicePropertyTapList;
     propertySize = 0;
     status = AudioObjectGetPropertyDataSize(deviceID, &propertyAddress, 0, NULL, &propertySize);
@@ -196,7 +181,6 @@ bool AudioDeviceManager::AddTapToDevice(AudioObjectID tapID, AudioObjectID devic
             }
             
             if (status == noErr) {
-                Logger::info("成功将 tap 添加到聚合设备");
                 CFRelease(tapUID);
                 return true;
             }
@@ -210,7 +194,6 @@ bool AudioDeviceManager::AddTapToDevice(AudioObjectID tapID, AudioObjectID devic
 bool AudioDeviceManager::RemoveTapFromDevice(AudioObjectID tapID, AudioObjectID deviceID) {
     OSStatus status;
     
-    // 获取 tap 的 UID
     AudioObjectPropertyAddress propertyAddress = {
         kAudioTapPropertyUID,
         kAudioObjectPropertyScopeGlobal,
@@ -226,7 +209,6 @@ bool AudioDeviceManager::RemoveTapFromDevice(AudioObjectID tapID, AudioObjectID 
         return false;
     }
     
-    // 获取当前的 tap 列表
     propertyAddress.mSelector = kAudioAggregateDevicePropertyTapList;
     propertySize = 0;
     status = AudioObjectGetPropertyDataSize(deviceID, &propertyAddress, 0, NULL, &propertySize);
@@ -241,7 +223,6 @@ bool AudioDeviceManager::RemoveTapFromDevice(AudioObjectID tapID, AudioObjectID 
                 newTapList = CFArrayCreateMutable(kCFAllocatorDefault, 0, &kCFTypeArrayCallBacks);
             }
             
-            // 查找并移除指定的 tap
             CFIndex count = CFArrayGetCount(newTapList);
             for (CFIndex i = 0; i < count; i++) {
                 CFStringRef currentUID = (CFStringRef)CFArrayGetValueAtIndex(newTapList, i);
@@ -259,7 +240,6 @@ bool AudioDeviceManager::RemoveTapFromDevice(AudioObjectID tapID, AudioObjectID 
             }
             
             if (status == noErr) {
-                Logger::info("成功从聚合设备移除 tap");
                 CFRelease(tapUID);
                 return true;
             }
@@ -273,8 +253,6 @@ bool AudioDeviceManager::RemoveTapFromDevice(AudioObjectID tapID, AudioObjectID 
 std::vector<AudioObjectID> AudioDeviceManager::GetDeviceTaps(AudioObjectID deviceID) {
     std::vector<AudioObjectID> taps;
     
-    Logger::info("开始获取设备 %u 的 tap 列表", (unsigned int)deviceID);
-    
     AudioObjectPropertyAddress propertyAddress = {
         kAudioHardwarePropertyTapList,
         kAudioObjectPropertyScopeGlobal,
@@ -283,20 +261,16 @@ std::vector<AudioObjectID> AudioDeviceManager::GetDeviceTaps(AudioObjectID devic
     
     UInt32 propertySize = 0;
     OSStatus status = AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject), &propertyAddress, 0, NULL, &propertySize);
-    Logger::info("获取到的属性数据大小: %u", propertySize);
     
     if (status == noErr) {
-        // 验证数据大小是否合理
         if (propertySize % sizeof(AudioObjectID) != 0) {
             Logger::error("无效的属性数据大小: %u，不是 AudioObjectID 的整数倍", propertySize);
             return taps;
         }
         
         int tapCount = propertySize / sizeof(AudioObjectID);
-        Logger::info("预计 tap 数量: %d", tapCount);
         
         if (tapCount == 0) {
-            Logger::info("设备上没有 tap");
             return taps;
         }
         
@@ -310,7 +284,6 @@ std::vector<AudioObjectID> AudioDeviceManager::GetDeviceTaps(AudioObjectID devic
                     continue;
                 }
                 
-                // 获取 tap 的 UID 进行验证
                 AudioObjectPropertyAddress uidPropertyAddress = {
                     kAudioTapPropertyUID,
                     kAudioObjectPropertyScopeGlobal,
@@ -322,9 +295,6 @@ std::vector<AudioObjectID> AudioDeviceManager::GetDeviceTaps(AudioObjectID devic
                 OSStatus uidStatus = AudioObjectGetPropertyData(tapID, &uidPropertyAddress, 0, NULL, &uidSize, &tapUID);
                 
                 if (uidStatus == noErr && tapUID) {
-                    Logger::info("tapID: %u, UID: %s", 
-                               (unsigned int)tapID,
-                               [(__bridge NSString *)tapUID UTF8String]);
                     CFRelease(tapUID);
                     taps.push_back(tapID);
                 } else {
@@ -347,14 +317,11 @@ std::vector<AudioObjectID> AudioDeviceManager::GetDeviceTaps(AudioObjectID devic
 std::vector<AudioObjectID> AudioDeviceManager::GetAggregateDevicesByName(const std::string& deviceName) {
     std::vector<AudioObjectID> filteredDevices;
     
-    // 获取所有聚合设备
     auto allDevices = GetAggregateDevices();
     
-    // 将设备名称转换为 CFStringRef
     CFStringRef targetName = CFStringCreateWithCString(kCFAllocatorDefault, deviceName.c_str(), kCFStringEncodingUTF8);
     
     for (AudioObjectID deviceID : allDevices) {
-        // 获取设备名称
         AudioObjectPropertyAddress propertyAddress = {
             kAudioObjectPropertyName,
             kAudioObjectPropertyScopeGlobal,
@@ -366,12 +333,8 @@ std::vector<AudioObjectID> AudioDeviceManager::GetAggregateDevicesByName(const s
         OSStatus status = AudioObjectGetPropertyData(deviceID, &propertyAddress, 0, NULL, &propertySize, &deviceNameRef);
         
         if (status == noErr && deviceNameRef) {
-            // 比较设备名称
             if (CFStringCompare(deviceNameRef, targetName, 0) == kCFCompareEqualTo) {
                 filteredDevices.push_back(deviceID);
-                Logger::info("找到匹配的设备: ID = %u, 名称 = %s", 
-                           (unsigned int)deviceID, 
-                           [(__bridge NSString *)deviceNameRef UTF8String]);
             }
             CFRelease(deviceNameRef);
         }
