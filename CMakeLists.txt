@@ -37,6 +37,7 @@ add_executable(recorder
     src/audio_device_manager.mm
     src/audio_system_capture.mm
     src/av_engine_taps_main.mm
+    src/voice_processing_test.mm
 )
 
 # 设置 Objective-C++ 编译选项

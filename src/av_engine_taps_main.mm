@@ -67,7 +67,7 @@ void TestAudioEngine() {
         }
 
         // 等待一小段时间让设备初始化
-        usleep(100000); // 100ms
+        usleep(300000); // 300ms
 
         // 获取扬声器格式
         AudioStreamBasicDescription speakerFormat;
@@ -111,6 +111,14 @@ void TestAudioEngine() {
 
         // 获取麦克风格式
         AVAudioInputNode* inputNode = [audioEngine inputNode];
+        NSError *error = nil;
+        BOOL success = [inputNode setVoiceProcessingEnabled:YES error:&error];
+        if (!success) {
+            Logger::error("开启语音处理失败: %s", [[error localizedDescription] UTF8String]);
+        }
+        Logger::info("开启语音处理成功");
+        Logger::info("isVoiceProcessingAGCEnabled: %d", inputNode.isVoiceProcessingAGCEnabled);
+
         AVAudioFormat* micFormat = [inputNode inputFormatForBus:0];
 
         // 创建源节点 sourceNode（使用扬声器格式）
@@ -189,7 +197,7 @@ void TestAudioEngine() {
         [audioEngine attachNode:sinkNode];
 
         // 2. 连接节点
-        NSError* error = nil;
+        error = nil;
         
         [audioEngine connect:sourceNode to:mixerNode format:standardFormat];
         
@@ -200,7 +208,7 @@ void TestAudioEngine() {
 
         inputNode.volume = 0.7;
         sourceNode.volume = 0.3;
-        mixerNode.outputVolume = 1.0;
+        mixerNode.outputVolume = 1.0 * 10.0;
 
         // 4. 创建输出文件
         NSString* currentDir = [[NSFileManager defaultManager] currentDirectoryPath];
@@ -261,7 +269,7 @@ void TestAudioEngine() {
             return;
         }
         // 等待一段时间
-        sleep(5);
+        sleep(30);
 
         // 停止音频引擎
         [audioEngine stop];

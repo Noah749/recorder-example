@@ -14,6 +14,7 @@
 void TestMicRecorder();
 void TestSystemCaptureRecorder();
 void TestAudioEngine();
+void TestVoiceProcessingInput();
 
 int main(int argc, char* argv[]) {
     try {
@@ -28,6 +29,8 @@ int main(int argc, char* argv[]) {
         // TestSystemCaptureRecorder();
         // 运行音频引擎 测试
         TestAudioEngine();
+
+        // TestVoiceProcessingInput();
         
         return 0;
     } catch (const std::exception& e) {
