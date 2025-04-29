@@ -70,7 +70,7 @@ void TestAudioEngine() {
         }
 
         // 等待一小段时间让设备初始化
-        usleep(1000000); // 增加到 1s
+        // usleep(2000000); // 增加到 1s
 
         // 获取扬声器格式
         AudioStreamBasicDescription speakerFormat;
@@ -174,10 +174,27 @@ void TestAudioEngine() {
         
         void (^tapBlock)(AVAudioPCMBuffer * _Nonnull, AVAudioTime * _Nonnull) = ^(AVAudioPCMBuffer * _Nonnull buffer, AVAudioTime * _Nonnull when) {
             if (micAudioFile) {
-                OSStatus status = ExtAudioFileWrite(micAudioFile, buffer.frameLength, buffer.audioBufferList);
+                // 创建临时缓冲区用于格式转换
+                AudioBufferList interleavedBufferList;
+                interleavedBufferList.mNumberBuffers = 1;
+                interleavedBufferList.mBuffers[0].mNumberChannels = buffer.format.channelCount;
+                interleavedBufferList.mBuffers[0].mDataByteSize = buffer.frameLength * sizeof(float) * buffer.format.channelCount;
+                interleavedBufferList.mBuffers[0].mData = malloc(interleavedBufferList.mBuffers[0].mDataByteSize);
+
+                float* interleavedData = (float*)interleavedBufferList.mBuffers[0].mData;
+                for (UInt32 frame = 0; frame < buffer.frameLength; ++frame) {
+                    for (UInt32 channel = 0; channel < buffer.format.channelCount; ++channel) {
+                        float* channelData = (float*)buffer.audioBufferList->mBuffers[channel].mData;
+                        interleavedData[frame * buffer.format.channelCount + channel] = channelData[frame];
+                    }
+                }
+
+                OSStatus status = ExtAudioFileWrite(micAudioFile, buffer.frameLength, &interleavedBufferList);
                 if (status != noErr) {
                     Logger::error("写入麦克风音频数据失败: %d", (int)status);
                 }
+
+                free(interleavedBufferList.mBuffers[0].mData);
             }
         };
         

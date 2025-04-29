@@ -258,7 +258,7 @@ void AudioSystemCapture::CatalogDeviceStreams() {
     OSStatus error = AudioObjectGetPropertyDataSize(deviceID_, &address, 0, nullptr, &size);
     auto streamCount = size / sizeof(AudioObjectID);
     if (error != kAudioHardwareNoError || streamCount == 0) {
-        Logger::error("获取设备流列表失败: %d, 流数量: %zu", (int)error, streamCount);
+        Logger::error("CatalogDeviceStreams 获取设备流列表失败: %d, 流数量: %zu", (int)error, streamCount);
         return;
     }
     
