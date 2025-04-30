@@ -229,7 +229,7 @@ bool AudioSystemCapture::AdaptToDevice(AudioObjectID deviceID) {
     UnregisterListeners();
     
     deviceID_ = deviceID;
-    CatalogDeviceStreams();
+//    CatalogDeviceStreams();
     RegisterListeners();
     
     bool success = true;
