@@ -1,4 +1,5 @@
 #include "logger.h"
+#include "aec_audio_unit.h"
 #include "audio_device_manager.h"
 #include "audio_system_capture.h"
 #import <CoreAudio/CoreAudio.h>
@@ -69,19 +70,6 @@ void TestAudioEngine() {
             return;
         }
 
-        // 等待一小段时间让设备初始化
-        // usleep(2000000); // 增加到 1s
-
-        // 获取扬声器格式
-        AudioStreamBasicDescription speakerFormat;
-        if (!systemCapture->GetAudioFormat(speakerFormat)) {
-            Logger::error("获取扬声器格式失败");
-            systemCapture->StopRecording();
-            delete systemCapture;
-            systemCapture = nullptr;
-            return;
-        }
-
         // 检查设备流
         AudioObjectPropertyAddress propertyAddress = {
             kAudioDevicePropertyStreams,
@@ -127,20 +115,22 @@ void TestAudioEngine() {
         Logger::info("成功获取设备流列表");
         delete[] streamList;
 
-        // 使用标准格式（用于扬声器）
-        AVAudioFormat* standardFormat = [[AVAudioFormat alloc] initStandardFormatWithSampleRate:speakerFormat.mSampleRate channels:speakerFormat.mChannelsPerFrame];
-        if (!standardFormat) {
-            Logger::error("创建标准格式失败");
+        // 获取音频格式
+        AudioStreamBasicDescription asbd;
+        if (!systemCapture->GetAudioFormat(asbd)) {
+            Logger::error("获取音频格式失败");
             systemCapture->StopRecording();
             delete systemCapture;
             systemCapture = nullptr;
             return;
         }
 
-        // 获取音频格式
-        AudioStreamBasicDescription asbd;
-        if (!systemCapture->GetAudioFormat(asbd)) {
-            Logger::error("获取音频格式失败");
+        Logger::info("系统音频 - 采样率: %f, 声道数: %d", asbd.mSampleRate, asbd.mChannelsPerFrame);
+
+        // 使用标准格式（用于扬声器）
+        AVAudioFormat* standardFormat = [[AVAudioFormat alloc] initStandardFormatWithSampleRate:asbd.mSampleRate channels:asbd.mChannelsPerFrame];
+        if (!standardFormat) {
+            Logger::error("创建标准格式失败");
             systemCapture->StopRecording();
             delete systemCapture;
             systemCapture = nullptr;
