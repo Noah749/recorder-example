@@ -17,7 +17,7 @@ MicRecorder::MicRecorder() {
     audioFormat_ = [[AVAudioFormat alloc] 
         initWithCommonFormat:AVAudioPCMFormatFloat32
         sampleRate:micFormat.sampleRate
-        channels:1
+        channels:micFormat.channelCount
         interleaved:NO];
         
     // 初始化 WAV 文件相关变量
@@ -88,13 +88,6 @@ bool MicRecorder::Start() {
         }
         return noErr;
     }];
-
-    // void (^tapBlock)(AVAudioPCMBuffer * _Nonnull, AVAudioTime * _Nonnull) = ^(AVAudioPCMBuffer * _Nonnull buffer, AVAudioTime * _Nonnull when) {
-    //         Logger::info("Tap 被触发");
-            
-    //     };
-        
-    // [inputNode_ installTapOnBus:0 bufferSize:1024 format:[inputNode_ inputFormatForBus:0] block:tapBlock];
     
     // 将输入节点连接到混音器（使用麦克风的实际格式）
     [audioEngine_ attachNode:mixerNode_];
@@ -103,6 +96,13 @@ bool MicRecorder::Start() {
     // 将混音器连接到 sinkNode（使用麦克风的实际格式）
     [audioEngine_ attachNode:sinkNode_];
     [audioEngine_ connect:mixerNode_ to:sinkNode_ format:[inputNode_ inputFormatForBus:0]];
+
+    // void (^tapBlock)(AVAudioPCMBuffer * _Nonnull, AVAudioTime * _Nonnull) = ^(AVAudioPCMBuffer * _Nonnull buffer, AVAudioTime * _Nonnull when) {
+    //         Logger::info("Tap 被触发");
+            
+    //     };
+        
+    // [inputNode_ installTapOnBus:0 bufferSize:1024 format:[inputNode_ inputFormatForBus:0] block:tapBlock];
     
     // 启动引擎
     if (![audioEngine_ startAndReturnError:&error]) {
