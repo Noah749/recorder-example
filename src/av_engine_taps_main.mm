@@ -160,7 +160,6 @@ void TestAudioEngine() {
         
         
         void (^tapBlock)(AVAudioPCMBuffer * _Nonnull, AVAudioTime * _Nonnull) = ^(AVAudioPCMBuffer * _Nonnull buffer, AVAudioTime * _Nonnull when) {
-            Logger::info("Tap 被触发");
             if (micAudioFile) {
                 // Logger::info("收到麦克风数据: %d 帧", (int)buffer.frameLength);
                 // 创建临时缓冲区用于格式转换
@@ -181,15 +180,13 @@ void TestAudioEngine() {
                 OSStatus status = ExtAudioFileWrite(micAudioFile, buffer.frameLength, &interleavedBufferList);
                 if (status != noErr) {
                     Logger::error("写入麦克风音频数据失败: %d", (int)status);
-                } else {
-                    Logger::info("成功写入麦克风数据");
                 }
 
                 free(interleavedBufferList.mBuffers[0].mData);
             }
         };
         
-        [inputNode installTapOnBus:0 bufferSize:1024 format:[inputNode inputFormatForBus:0] block:tapBlock];
+        [inputNode installTapOnBus:0 bufferSize:1024 format: micFormat block:tapBlock];
         Logger::info("Tap 已安装到 inputNode");
 
         // 创建源节点 sourceNode（使用扬声器格式）
@@ -293,7 +290,7 @@ void TestAudioEngine() {
         // [audioEngine connect:aec_audio_unit to:mixerNode format:standardFormat];
         // Logger::info("已连接 aec_audio_unit 到 mixerNode");
         
-        AVAudioFormat* mixerOutputFormat = [[AVAudioFormat alloc] initStandardFormatWithSampleRate:44100 channels:2];
+        AVAudioFormat* mixerOutputFormat = [[AVAudioFormat alloc] initStandardFormatWithSampleRate: micFormat.sampleRate channels:2];
         [audioEngine connect:mixerNode to:sinkNode format:mixerOutputFormat];
         Logger::info("已连接 mixerNode 到 sinkNode");
 
@@ -435,7 +432,7 @@ void TestAudioEngine() {
         // 创建混合音频文件
         AudioStreamBasicDescription mixFileFormat;
         memset(&mixFileFormat, 0, sizeof(mixFileFormat));
-        mixFileFormat.mSampleRate = 44100;  // 使用标准采样率
+        mixFileFormat.mSampleRate = micFormat.sampleRate;
         mixFileFormat.mFormatID = kAudioFormatLinearPCM;
         mixFileFormat.mFormatFlags = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked;
         mixFileFormat.mBitsPerChannel = 32;
