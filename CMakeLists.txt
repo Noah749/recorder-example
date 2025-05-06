@@ -38,12 +38,12 @@ add_executable(recorder
     src/audio_system_capture.mm
     src/av_engine_taps_main.mm
     src/voice_processing_test.mm
-    src/aec_audio_unit.mm
+    src/audio_nodes/audio_nodes.mm
 )
 
 # 设置 Objective-C++ 编译选项
 set_target_properties(recorder PROPERTIES
-    COMPILE_FLAGS "-x objective-c++ -fobjc-arc"
+    COMPILE_FLAGS "-x objective-c++ -fobjc-arc -fmodules"
     OUTPUT_NAME "recorder"
 )
 

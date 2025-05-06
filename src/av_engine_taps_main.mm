@@ -2,6 +2,7 @@
 #include "aec_audio_unit.h"
 #include "audio_device_manager.h"
 #include "audio_system_capture.h"
+#include "audio_nodes/audio_nodes.h"
 #import <CoreAudio/CoreAudio.h>
 #import <CoreAudio/CoreAudioTypes.h>
 #import <CoreAudio/AudioHardware.h>
@@ -150,20 +151,20 @@ void TestAudioEngine() {
         // 获取麦克风格式
         AVAudioInputNode* inputNode = [audioEngine inputNode];
         NSError *error = nil;
-        // BOOL success = [inputNode setVoiceProcessingEnabled:YES error:&error];
-        // if (!success) {
-        //     Logger::error("开启语音处理失败: %s", [[error localizedDescription] UTF8String]);
-        // }
-        // Logger::info("开启语音处理成功");
-        // Logger::info("isVoiceProcessingAGCEnabled: %d", inputNode.isVoiceProcessingAGCEnabled);
-
-
+        
+        // 检查 inputNode 状态
+        Logger::info("inputNode 音量: %f", inputNode.volume);
         
         AVAudioFormat* micFormat = [inputNode inputFormatForBus:0];
         Logger::info("麦克风格式 - 采样率: %f, 声道数: %d", micFormat.sampleRate, micFormat.channelCount);
         
+        // 安装 tap 之前先移除可能存在的 tap
+        // [inputNode removeTapOnBus:0];
+        
         void (^tapBlock)(AVAudioPCMBuffer * _Nonnull, AVAudioTime * _Nonnull) = ^(AVAudioPCMBuffer * _Nonnull buffer, AVAudioTime * _Nonnull when) {
+            Logger::info("Tap 被触发");
             if (micAudioFile) {
+                Logger::info("收到麦克风数据: %d 帧", (int)buffer.frameLength);
                 // 创建临时缓冲区用于格式转换
                 AudioBufferList interleavedBufferList;
                 interleavedBufferList.mNumberBuffers = 1;
@@ -182,6 +183,8 @@ void TestAudioEngine() {
                 OSStatus status = ExtAudioFileWrite(micAudioFile, buffer.frameLength, &interleavedBufferList);
                 if (status != noErr) {
                     Logger::error("写入麦克风音频数据失败: %d", (int)status);
+                } else {
+                    Logger::info("成功写入麦克风数据");
                 }
 
                 free(interleavedBufferList.mBuffers[0].mData);
@@ -189,6 +192,7 @@ void TestAudioEngine() {
         };
         
         [inputNode installTapOnBus:0 bufferSize:1024 format:micFormat block:tapBlock];
+        Logger::info("Tap 已安装到 inputNode");
 
         // 创建源节点 sourceNode（使用扬声器格式）
         AVAudioSourceNode* sourceNode = [[AVAudioSourceNode alloc] initWithFormat:standardFormat renderBlock:^OSStatus(BOOL* isSilence, const AudioTimeStamp* timestamp, AVAudioFrameCount frameCount, AudioBufferList* outputData) {
@@ -229,6 +233,18 @@ void TestAudioEngine() {
             return noErr;
         }];
 
+        AECAudioNode *aecAudioNode = [[AECAudioNode alloc] init];
+        if (![aecAudioNode initializeWithError:&error]) {
+            Logger::error("初始化 AECAudioNode 失败: %s", error.localizedDescription.UTF8String);
+            systemCapture->StopRecording();
+            delete systemCapture;
+            systemCapture = nullptr;
+            return;
+        }
+
+         // 获取 AVAudioUnit
+        AVAudioUnit *aec_audio_unit = aecAudioNode.audioUnit;
+
         // 创建 sinkNode
         AVAudioSinkNode* sinkNode = [[AVAudioSinkNode alloc] initWithReceiverBlock:^OSStatus(const AudioTimeStamp* timestamp,
                                                                                    AVAudioFrameCount frameCount,
@@ -264,20 +280,29 @@ void TestAudioEngine() {
         [audioEngine attachNode:sourceNode];
         [audioEngine attachNode:mixerNode];
         [audioEngine attachNode:sinkNode];
+        // [audioEngine attachNode:aec_audio_unit];
 
         // 2. 连接节点
         error = nil;
         
         [audioEngine connect:sourceNode to:mixerNode format:standardFormat];
         
+        // 先连接 inputNode 到 aec_audio_unit，使用标准格式
         [audioEngine connect:inputNode to:mixerNode format:micFormat];
+        // Logger::info("已连接 inputNode 到 aec_audio_unit");
+
+        // 再连接 aec_audio_unit 到 mixerNode
+        // [audioEngine connect:aec_audio_unit to:mixerNode format:standardFormat];
+        // Logger::info("已连接 aec_audio_unit 到 mixerNode");
         
         AVAudioFormat* mixerOutputFormat = [[AVAudioFormat alloc] initStandardFormatWithSampleRate:44100 channels:2];
         [audioEngine connect:mixerNode to:sinkNode format:mixerOutputFormat];
+        Logger::info("已连接 mixerNode 到 sinkNode");
 
-        inputNode.volume = 0.7;
+        // 设置音量
+        inputNode.volume = 1.0;  // 增加麦克风音量
         sourceNode.volume = 0.3;
-        mixerNode.outputVolume = 1.0 * 10.0;
+        mixerNode.outputVolume = 1.0;
 
         // 4. 创建输出文件
         NSString* currentDir = [[NSFileManager defaultManager] currentDirectoryPath];
@@ -509,11 +534,20 @@ void TestAudioEngine() {
             systemCapture = nullptr;
             return;
         }
+        Logger::info("音频引擎启动成功");
+
         // 等待一段时间
         sleep(10);  // 增加到 10 秒
 
+        // 先移除 tap
+        [inputNode removeTapOnBus:0];
+        [aec_audio_unit removeTapOnBus:0];
+        [sourceNode removeTapOnBus:0];
+        Logger::info("已移除所有 tap");
+
         // 停止音频引擎
         [audioEngine stop];
+        Logger::info("音频引擎已停止");
 
         // 停止系统音频捕获
         systemCapture->StopRecording();
@@ -553,6 +587,7 @@ void TestAudioEngine() {
             mixAudioFile = nullptr;
         }
 
+        // 最后再释放音频引擎
         sourceNode = nil;
         audioEngine = nil;
 
