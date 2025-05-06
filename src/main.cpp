@@ -24,11 +24,11 @@ int main(int argc, char* argv[]) {
         Logger::info("启动本地录音程序");
         
         // 运行麦克风录音测试
-        // TestMicRecorder();
+        TestMicRecorder();
         // 运行系统音频捕获测试
         // TestSystemCaptureRecorder();
         // 运行音频引擎 测试
-        TestAudioEngine();
+        // TestAudioEngine();
 
         // TestVoiceProcessingInput();
         

@@ -9,10 +9,14 @@ MicRecorder::MicRecorder() {
     inputNode_ = [audioEngine_ inputNode];
     mixerNode_ = [[AVAudioMixerNode alloc] init];
     
-    // 设置音频格式
+    // 获取麦克风的实际格式
+    AVAudioFormat* micFormat = [inputNode_ inputFormatForBus:0];
+    Logger::info("麦克风实际格式 - 采样率: %f, 声道数: %d", micFormat.sampleRate, micFormat.channelCount);
+    
+    // 设置音频格式（使用麦克风的实际采样率）
     audioFormat_ = [[AVAudioFormat alloc] 
         initWithCommonFormat:AVAudioPCMFormatFloat32
-        sampleRate:44100
+        sampleRate:micFormat.sampleRate
         channels:1
         interleaved:NO];
         
@@ -31,9 +35,9 @@ MicRecorder::~MicRecorder() {
 bool MicRecorder::Start() {
     NSError* error = nil;
     
-    // 设置文件输出格式
+    // 设置文件输出格式（使用麦克风的实际采样率）
     memset(&fileFormat_, 0, sizeof(fileFormat_));
-    fileFormat_.mSampleRate = 44100;
+    fileFormat_.mSampleRate = audioFormat_.sampleRate;  // 使用麦克风的实际采样率
     fileFormat_.mFormatID = kAudioFormatLinearPCM;
     fileFormat_.mFormatFlags = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked;
     fileFormat_.mBitsPerChannel = 32;
@@ -85,13 +89,13 @@ bool MicRecorder::Start() {
         return noErr;
     }];
     
-    // 将输入节点连接到混音器
+    // 将输入节点连接到混音器（使用麦克风的实际格式）
     [audioEngine_ attachNode:mixerNode_];
-    [audioEngine_ connect:inputNode_ to:mixerNode_ format:audioFormat_];
+    [audioEngine_ connect:inputNode_ to:mixerNode_ format:[inputNode_ inputFormatForBus:0]];
     
-    // 将混音器连接到 sinkNode
+    // 将混音器连接到 sinkNode（使用麦克风的实际格式）
     [audioEngine_ attachNode:sinkNode_];
-    [audioEngine_ connect:mixerNode_ to:sinkNode_ format:audioFormat_];
+    [audioEngine_ connect:mixerNode_ to:sinkNode_ format:[inputNode_ inputFormatForBus:0]];
     
     // 启动引擎
     if (![audioEngine_ startAndReturnError:&error]) {
