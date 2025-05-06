@@ -158,13 +158,11 @@ void TestAudioEngine() {
         AVAudioFormat* micFormat = [inputNode inputFormatForBus:0];
         Logger::info("麦克风格式 - 采样率: %f, 声道数: %d", micFormat.sampleRate, micFormat.channelCount);
         
-        // 安装 tap 之前先移除可能存在的 tap
-        // [inputNode removeTapOnBus:0];
         
         void (^tapBlock)(AVAudioPCMBuffer * _Nonnull, AVAudioTime * _Nonnull) = ^(AVAudioPCMBuffer * _Nonnull buffer, AVAudioTime * _Nonnull when) {
             Logger::info("Tap 被触发");
             if (micAudioFile) {
-                Logger::info("收到麦克风数据: %d 帧", (int)buffer.frameLength);
+                // Logger::info("收到麦克风数据: %d 帧", (int)buffer.frameLength);
                 // 创建临时缓冲区用于格式转换
                 AudioBufferList interleavedBufferList;
                 interleavedBufferList.mNumberBuffers = 1;
@@ -191,7 +189,7 @@ void TestAudioEngine() {
             }
         };
         
-        [inputNode installTapOnBus:0 bufferSize:1024 format:micFormat block:tapBlock];
+        [inputNode installTapOnBus:0 bufferSize:1024 format:[inputNode inputFormatForBus:0] block:tapBlock];
         Logger::info("Tap 已安装到 inputNode");
 
         // 创建源节点 sourceNode（使用扬声器格式）
@@ -300,8 +298,8 @@ void TestAudioEngine() {
         Logger::info("已连接 mixerNode 到 sinkNode");
 
         // 设置音量
-        inputNode.volume = 1.0;  // 增加麦克风音量
-        sourceNode.volume = 0.3;
+        inputNode.volume = 0.5;
+        sourceNode.volume = 0.5;
         mixerNode.outputVolume = 1.0;
 
         // 4. 创建输出文件
@@ -540,9 +538,12 @@ void TestAudioEngine() {
         sleep(10);  // 增加到 10 秒
 
         // 先移除 tap
-        [inputNode removeTapOnBus:0];
-        [aec_audio_unit removeTapOnBus:0];
-        [sourceNode removeTapOnBus:0];
+        if (inputNode) {
+            [inputNode removeTapOnBus:0];
+        }
+        if (sourceNode) {
+            [sourceNode removeTapOnBus:0];
+        }
         Logger::info("已移除所有 tap");
 
         // 停止音频引擎
