@@ -1,4 +1,5 @@
 #import "audio_nodes.h"
+#include "logger.h"
 
 @implementation AECUnit {
     AudioBufferList *_inputBufferList;
@@ -8,6 +9,7 @@
     AUAudioUnitBus *_outputBus;
     AUAudioUnitBusArray *_inputBusArray;
     AUAudioUnitBusArray *_outputBusArray;
+    AudioConverterRef _converter;
 }
 
 - (instancetype)initWithComponentDescription:(AudioComponentDescription)componentDescription
@@ -16,9 +18,10 @@
     if (self) {
         _inputBufferList = NULL;
         _outputBufferList = NULL;
+        _converter = NULL;
         
-        // 创建输入和输出总线，初始格式将在连接时设置
-        AVAudioFormat *defaultFormat = [[AVAudioFormat alloc] initStandardFormatWithSampleRate:48000 channels:2];
+        // 创建输入和输出总线，使用默认格式
+        AVAudioFormat *defaultFormat = [[AVAudioFormat alloc] initStandardFormatWithSampleRate:44100 channels:1];
         
         _inputBus = [[AUAudioUnitBus alloc] initWithFormat:defaultFormat error:outError];
         _outputBus = [[AUAudioUnitBus alloc] initWithFormat:defaultFormat error:outError];
@@ -56,26 +59,22 @@
                 return status;
             }
             
-            // 处理声道数转换：将单声道数据复制到双声道的两个通道
-            if (strongSelf->_inputBufferList->mNumberBuffers == 1 && outputData->mNumberBuffers == 2) {
-                float* inputData = (float*)strongSelf->_inputBufferList->mBuffers[0].mData;
-                float* leftChannel = (float*)outputData->mBuffers[0].mData;
-                float* rightChannel = (float*)outputData->mBuffers[1].mData;
-                
-                for (UInt32 frame = 0; frame < frameCount; ++frame) {
-                    leftChannel[frame] = inputData[frame];
-                    rightChannel[frame] = inputData[frame];  // 将相同的音频数据复制到两个通道
-                }
-            } else {
-                // 如果声道数相同，直接复制
+            if (!strongSelf->_converter) {
                 for (UInt32 channel = 0; channel < outputData->mNumberBuffers; ++channel) {
                     memcpy(outputData->mBuffers[channel].mData,
                           strongSelf->_inputBufferList->mBuffers[channel].mData,
                           frameCount * sizeof(float));
                 }
+                return noErr;
             }
             
-            return noErr;
+            UInt32 ioOutputDataPacketSize = frameCount;
+            status = AudioConverterConvertComplexBuffer(strongSelf->_converter,
+                                                      frameCount,
+                                                      strongSelf->_inputBufferList,
+                                                      outputData);
+            
+            return status;
         };
     }
     return self;
@@ -126,6 +125,22 @@
     NSLog(@"分配资源 - 输入格式: 采样率=%f, 声道数=%d", inputFormat.sampleRate, (int)inputFormat.channelCount);
     NSLog(@"分配资源 - 输出格式: 采样率=%f, 声道数=%d", outputFormat.sampleRate, (int)outputFormat.channelCount);
 
+    // 如果输入输出格式不同，创建转换器
+    if (![inputFormat isEqual:outputFormat]) {
+        AudioStreamBasicDescription inputDesc = *inputFormat.streamDescription;
+        AudioStreamBasicDescription outputDesc = *outputFormat.streamDescription;
+        
+        OSStatus status = AudioConverterNew(&inputDesc, &outputDesc, &_converter);
+        if (status != noErr) {
+            if (outError) {
+                *outError = [NSError errorWithDomain:NSOSStatusErrorDomain
+                                              code:status
+                                          userInfo:nil];
+            }
+            return NO;
+        }
+    }
+
     _inputBufferList = (AudioBufferList *)malloc(sizeof(AudioBufferList) + (sizeof(AudioBuffer) * (inputFormat.channelCount - 1)));
     _outputBufferList = (AudioBufferList *)malloc(sizeof(AudioBufferList) + (sizeof(AudioBuffer) * (outputFormat.channelCount - 1)));
 
@@ -144,7 +159,7 @@
     // 为每个通道分配内存
     for (UInt32 i = 0; i < _inputBufferList->mNumberBuffers; ++i) {
         _inputBufferList->mBuffers[i].mNumberChannels = 1;
-        _inputBufferList->mBuffers[i].mDataByteSize = 4096 * sizeof(float);  // 分配足够大的缓冲区
+        _inputBufferList->mBuffers[i].mDataByteSize = 4096 * sizeof(float);
         _inputBufferList->mBuffers[i].mData = malloc(_inputBufferList->mBuffers[i].mDataByteSize);
         if (!_inputBufferList->mBuffers[i].mData) {
             if (outError) {
@@ -158,7 +173,7 @@
 
     for (UInt32 i = 0; i < _outputBufferList->mNumberBuffers; ++i) {
         _outputBufferList->mBuffers[i].mNumberChannels = 1;
-        _outputBufferList->mBuffers[i].mDataByteSize = 4096 * sizeof(float);  // 分配足够大的缓冲区
+        _outputBufferList->mBuffers[i].mDataByteSize = 4096 * sizeof(float);
         _outputBufferList->mBuffers[i].mData = malloc(_outputBufferList->mBuffers[i].mDataByteSize);
         if (!_outputBufferList->mBuffers[i].mData) {
             if (outError) {
@@ -174,6 +189,11 @@
 }
 
 - (void)deallocateRenderResources {
+    if (_converter) {
+        AudioConverterDispose(_converter);
+        _converter = NULL;
+    }
+    
     if (_inputBufferList) {
         if (_inputBufferList->mBuffers[0].mData) {
             free(_inputBufferList->mBuffers[0].mData);

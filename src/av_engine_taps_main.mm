@@ -275,7 +275,7 @@ void TestAudioEngine() {
         [audioEngine attachNode:sourceNode];
         [audioEngine attachNode:mixerNode];
         [audioEngine attachNode:sinkNode];
-        // [audioEngine attachNode:aec_audio_unit];
+        [audioEngine attachNode:aec_audio_unit];
 
         // 2. 连接节点
         error = nil;
@@ -283,12 +283,12 @@ void TestAudioEngine() {
         [audioEngine connect:sourceNode to:mixerNode format:standardFormat];
         
         // 先连接 inputNode 到 aec_audio_unit，使用标准格式
-        [audioEngine connect:inputNode to:mixerNode format:micFormat];
-        // Logger::info("已连接 inputNode 到 aec_audio_unit");
+        [audioEngine connect:inputNode to:aec_audio_unit format:micFormat];
+        Logger::info("已连接 inputNode 到 aec_audio_unit");
 
         // 再连接 aec_audio_unit 到 mixerNode
-        // [audioEngine connect:aec_audio_unit to:mixerNode format:standardFormat];
-        // Logger::info("已连接 aec_audio_unit 到 mixerNode");
+        [audioEngine connect:aec_audio_unit to:mixerNode format:standardFormat];
+        Logger::info("已连接 aec_audio_unit 到 mixerNode");
         
         AVAudioFormat* mixerOutputFormat = [[AVAudioFormat alloc] initStandardFormatWithSampleRate: micFormat.sampleRate channels:2];
         [audioEngine connect:mixerNode to:sinkNode format:mixerOutputFormat];
