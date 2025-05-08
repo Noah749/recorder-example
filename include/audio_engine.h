@@ -10,11 +10,11 @@
 
 class AudioEngine {
 public:
-    AudioEngine();
+    AudioEngine(AggregateDevice* aggregateDevice);
     ~AudioEngine();
     
     // 初始化音频引擎
-    bool Initialize(AggregateDevice* aggregateDevice);
+    bool Initialize();
     
     // 准备音频引擎
     bool Prepare();

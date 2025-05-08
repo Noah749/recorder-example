@@ -1,4 +1,5 @@
 #include "logger.h"
+#include "audio_engine.h"
 #include "audio_nodes/audio_nodes.h"
 #include "audio_device_manager.h"
 #include "audio_system_capture.h"
@@ -36,7 +37,7 @@ void AudioDataCallback(const AudioBufferList* inInputData, UInt32 inNumberFrames
     }
 }
 
-void TestAudioEngine() {
+void TestAudioEngine2() {
     // @autoreleasepool {
         // 创建系统音频捕获
         AggregateDevice aggregateDevice("Plaud.ai.AggregateDevice");
@@ -587,3 +588,70 @@ void TestAudioEngine() {
         Logger::info("混合音频已保存到: %s", [mixOutputPath UTF8String]);
     // }
 } 
+
+void TestAudioEngine() {
+    Logger::info("开始初始化音频引擎...");
+    
+    // 1. 创建并初始化 AggregateDevice
+    Logger::info("正在创建聚合设备...");
+    AggregateDevice aggregateDevice("Plaud.ai.AggregateDevice");
+    Logger::info("聚合设备创建完成");
+
+    // 2. 创建并初始化 AudioEngine
+    Logger::info("正在初始化音频引擎...");
+    AudioEngine audioEngine(&aggregateDevice);
+    Logger::info("音频引擎初始化完成");
+
+    // 3. 设置输出文件路径
+    NSString* currentDir = [[NSFileManager defaultManager] currentDirectoryPath];
+    NSString* micOutputPath = [currentDir stringByAppendingPathComponent:@"mic_audio.wav"];
+    NSString* sourceOutputPath = [currentDir stringByAppendingPathComponent:@"source_audio.wav"];
+    NSString* mixOutputPath = [currentDir stringByAppendingPathComponent:@"mix_audio.wav"];
+
+    Logger::info("设置输出文件路径:");
+    Logger::info("- 麦克风音频: %s", [micOutputPath UTF8String]);
+    Logger::info("- 系统音频: %s", [sourceOutputPath UTF8String]);
+    Logger::info("- 混合音频: %s", [mixOutputPath UTF8String]);
+
+    audioEngine.SetOutputPaths(
+        [micOutputPath UTF8String],
+        [sourceOutputPath UTF8String],
+        [mixOutputPath UTF8String]
+    );
+
+    // 4. 准备音频引擎
+    Logger::info("正在准备音频引擎...");
+    if (!audioEngine.Prepare()) {
+        Logger::error("准备音频引擎失败，检查以下可能的原因:");
+        Logger::error("1. 文件路径权限");
+        Logger::error("2. 音频设备权限");
+        Logger::error("3. 系统音频设置");
+        return;
+    }
+    Logger::info("音频引擎准备完成");
+
+    // 5. 启动音频引擎
+    Logger::info("正在启动音频引擎...");
+    if (!audioEngine.Start()) {
+        Logger::error("启动音频引擎失败，检查以下可能的原因:");
+        Logger::error("1. 音频设备是否被其他应用占用");
+        Logger::error("2. 系统音频服务状态");
+        return;
+    }
+
+    Logger::info("音频引擎启动成功，开始录音...");
+
+    // 6. 等待一段时间（这里等待10秒）
+    Logger::info("将录制 10 秒音频...");
+    sleep(10);
+
+    // 7. 停止录音
+    Logger::info("正在停止录音...");
+    audioEngine.Stop();
+
+    Logger::info("录音完成");
+    Logger::info("文件保存位置:");
+    Logger::info("- 麦克风音频: %s", [micOutputPath UTF8String]);
+    Logger::info("- 系统音频: %s", [sourceOutputPath UTF8String]);
+    Logger::info("- 混合音频: %s", [mixOutputPath UTF8String]);
+}

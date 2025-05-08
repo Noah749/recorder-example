@@ -6,7 +6,7 @@
 #import <AudioUnit/AudioUnit.h>
 #import <CoreAudio/CATapDescription.h>
 
-AudioEngine::AudioEngine()
+AudioEngine::AudioEngine(AggregateDevice* aggregateDevice)
     : audioEngine_(nullptr)
     , inputNode_(nullptr)
     , sourceNode_(nullptr)
@@ -14,7 +14,7 @@ AudioEngine::AudioEngine()
     , sinkNode_(nullptr)
     , aecAudioUnit_(nullptr)
     , systemCapture_(nullptr)
-    , aggregateDevice_(nullptr)
+    , aggregateDevice_(aggregateDevice)
     , standardFormat_(nullptr)
     , micFormat_(nullptr)
     , mixerOutputFormat_(nullptr)
@@ -29,9 +29,11 @@ AudioEngine::~AudioEngine() {
     Stop();
 }
 
-bool AudioEngine::Initialize(AggregateDevice* aggregateDevice) {
-    aggregateDevice_ = aggregateDevice;
-    
+bool AudioEngine::Initialize() { 
+    if (aggregateDevice_ == nullptr) {
+        Logger::error("聚合设备为空");
+        return false;
+    }
     // 创建系统音频捕获
     systemCapture_ = new AudioSystemCapture(aggregateDevice_);
     if (!systemCapture_) {
@@ -75,6 +77,7 @@ bool AudioEngine::Initialize(AggregateDevice* aggregateDevice) {
 }
 
 void AudioEngine::SetupAudioFormats() {
+    Logger::info("设置音频格式");
     // 获取系统音频格式
     AudioStreamBasicDescription asbd;
     if (!systemCapture_->GetAudioFormat(asbd)) {
@@ -88,13 +91,15 @@ void AudioEngine::SetupAudioFormats() {
         Logger::error("创建标准格式失败");
         return;
     }
+    Logger::info("标准格式 - 采样率: %f, 声道数: %d", standardFormat_.sampleRate, standardFormat_.channelCount);
     
     // 获取麦克风格式
     micFormat_ = [inputNode_ inputFormatForBus:0];
     Logger::info("麦克风格式 - 采样率: %f, 声道数: %d", micFormat_.sampleRate, micFormat_.channelCount);
     
     // 设置混音器输出格式
-    mixerOutputFormat_ = [[AVAudioFormat alloc] initStandardFormatWithSampleRate:asbd.mSampleRate channels:asbd.mChannelsPerFrame];
+    mixerOutputFormat_ = [[AVAudioFormat alloc] initStandardFormatWithSampleRate: micFormat_.sampleRate channels: 2];
+    Logger::info("混音器输出格式 - 采样率: %f, 声道数: %d", mixerOutputFormat_.sampleRate, mixerOutputFormat_.channelCount);
 }
 
 bool AudioEngine::Prepare() {
@@ -112,11 +117,6 @@ bool AudioEngine::Prepare() {
     
     // 连接音频节点
     if (!ConnectNodes()) {
-        return false;
-    }
-    
-    // 创建音频文件
-    if (!CreateAudioFiles()) {
         return false;
     }
     
@@ -220,6 +220,68 @@ bool AudioEngine::CreateNodes() {
     [audioEngine_ attachNode:sinkNode_];
     [audioEngine_ attachNode:aecAudioUnit_];
     
+    // 为麦克风输入节点安装 tap
+    Logger::info("正在为麦克风输入节点安装 tap...");
+    void (^tapBlock)(AVAudioPCMBuffer * _Nonnull, AVAudioTime * _Nonnull) = ^(AVAudioPCMBuffer * _Nonnull buffer, AVAudioTime * _Nonnull when) {
+                if (micAudioFile_) {
+                    Logger::info("收到麦克风数据: %d 帧", (int)buffer.frameLength);
+                    // 创建临时缓冲区用于格式转换
+                    AudioBufferList interleavedBufferList;
+                    interleavedBufferList.mNumberBuffers = 1;
+                    interleavedBufferList.mBuffers[0].mNumberChannels = buffer.format.channelCount;
+                    interleavedBufferList.mBuffers[0].mDataByteSize = buffer.frameLength * sizeof(float) * buffer.format.channelCount;
+                    interleavedBufferList.mBuffers[0].mData = malloc(interleavedBufferList.mBuffers[0].mDataByteSize);
+
+                    float* interleavedData = (float*)interleavedBufferList.mBuffers[0].mData;
+                    for (UInt32 frame = 0; frame < buffer.frameLength; ++frame) {
+                        for (UInt32 channel = 0; channel < buffer.format.channelCount; ++channel) {
+                            float* channelData = (float*)buffer.audioBufferList->mBuffers[channel].mData;
+                            interleavedData[frame * buffer.format.channelCount + channel] = channelData[frame];
+                        }
+                    }
+
+                    OSStatus status = ExtAudioFileWrite(micAudioFile_, buffer.frameLength, &interleavedBufferList);
+                    if (status != noErr) {
+                        Logger::error("写入麦克风音频数据失败: %d", (int)status);
+                    }
+
+                    free(interleavedBufferList.mBuffers[0].mData);
+                }
+    };
+            
+    [inputNode_ installTapOnBus:0 bufferSize:1024 format: micFormat_ block:tapBlock];
+    Logger::info("麦克风输入节点 tap 安装完成");
+        
+    // 为系统音频源节点安装 tap
+    Logger::info("正在为系统音频源节点安装 tap...");
+    [sourceNode_ installTapOnBus:0 bufferSize:1024 format:standardFormat_ block:^(AVAudioPCMBuffer * _Nonnull buffer, AVAudioTime * _Nonnull when) {
+        Logger::info("收到系统音频数据: %d 帧", (int)buffer.frameLength);
+        if (sourceAudioFile_) {
+            // 创建临时缓冲区用于格式转换
+            AudioBufferList interleavedBufferList;
+            interleavedBufferList.mNumberBuffers = 1;
+            interleavedBufferList.mBuffers[0].mNumberChannels = buffer.format.channelCount;
+            interleavedBufferList.mBuffers[0].mDataByteSize = buffer.frameLength * sizeof(float) * buffer.format.channelCount;
+            interleavedBufferList.mBuffers[0].mData = malloc(interleavedBufferList.mBuffers[0].mDataByteSize);
+
+            float* interleavedData = (float*)interleavedBufferList.mBuffers[0].mData;
+            for (UInt32 frame = 0; frame < buffer.frameLength; ++frame) {
+                for (UInt32 channel = 0; channel < buffer.format.channelCount; ++channel) {
+                    float* channelData = (float*)buffer.audioBufferList->mBuffers[channel].mData;
+                    interleavedData[frame * buffer.format.channelCount + channel] = channelData[frame];
+                }
+            }
+
+            OSStatus status = ExtAudioFileWrite(sourceAudioFile_, buffer.frameLength, &interleavedBufferList);
+            if (status != noErr) {
+                Logger::error("写入 source 音频数据失败: %d", (int)status);
+            }
+
+            free(interleavedBufferList.mBuffers[0].mData);
+        }
+    }];
+    Logger::info("系统音频源节点 tap 安装完成");
+        
     return true;
 }
 
@@ -252,8 +314,17 @@ bool AudioEngine::CreateAudioFiles() {
     micFileFormat.mFramesPerPacket = 1;
     micFileFormat.mBytesPerFrame = micFileFormat.mChannelsPerFrame * (micFileFormat.mBitsPerChannel / 8);
     micFileFormat.mBytesPerPacket = micFileFormat.mBytesPerFrame;
+
+    Logger::info("麦克风音频文件格式参数:");
+    Logger::info("- 采样率: %.0f Hz", micFileFormat.mSampleRate);
+    Logger::info("- 声道数: %d", micFileFormat.mChannelsPerFrame);
+    Logger::info("- 位深: %d bits", micFileFormat.mBitsPerChannel);
+    Logger::info("- 每帧字节数: %d bytes", micFileFormat.mBytesPerFrame);
+    Logger::info("- 每包字节数: %d bytes", micFileFormat.mBytesPerPacket);
     
     NSURL* micOutputURL = [NSURL fileURLWithPath:[NSString stringWithUTF8String:micOutputPath_.c_str()]];
+    Logger::info("麦克风输出文件路径: %s", micOutputPath_.c_str());
+    
     OSStatus status = ExtAudioFileCreateWithURL((__bridge CFURLRef)micOutputURL,
                                               kAudioFileWAVEType,
                                               &micFileFormat,
@@ -262,8 +333,14 @@ bool AudioEngine::CreateAudioFiles() {
                                               &micAudioFile_);
     if (status != noErr) {
         Logger::error("创建麦克风音频文件失败: %d", (int)status);
+        Logger::error("检查以下可能的原因:");
+        Logger::error("1. 文件路径是否有效");
+        Logger::error("2. 是否有写入权限");
+        Logger::error("3. 音频格式参数是否正确");
+        Logger::error("4. 磁盘空间是否足够");
         return false;
     }
+    Logger::info("麦克风音频文件创建成功");
     
     // 创建源音频文件
     AudioStreamBasicDescription sourceFileFormat;
@@ -336,6 +413,17 @@ void AudioEngine::CleanupAudioFiles() {
 bool AudioEngine::Start() {
     if (isRunning_) {
         return true;
+    }
+
+    if (!Initialize()) {
+        Logger::error("初始化失败");
+        return false;
+    }
+    
+    // 创建音频文件
+    if (!CreateAudioFiles()) {
+        Logger::error("创建音频文件失败");
+        return false;
     }
     
     NSError *error = nil;
