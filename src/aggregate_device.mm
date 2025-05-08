@@ -79,7 +79,7 @@ AggregateDevice::AggregateDevice(const std::string& deviceName) : deviceID(kAudi
     const void *values[] = {
         name,
         uid,
-        kCFBooleanFalse
+        kCFBooleanTrue
     };
     
     CFDictionaryRef description = CFDictionaryCreate(
@@ -253,7 +253,7 @@ AudioObjectID AggregateDevice::CreateTap(const std::string& tapName) {
     tapDescription.processes = [NSMutableArray array];
     tapDescription.name = [NSString stringWithUTF8String:tapName.c_str()];
     tapDescription.muteBehavior = CATapUnmuted;
-    tapDescription.privateTap = NO;
+    tapDescription.privateTap = YES;
     tapDescription.exclusive = YES;
     tapDescription.mixdown = YES;
     tapDescription.mono = NO;
