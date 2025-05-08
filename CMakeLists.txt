@@ -40,6 +40,7 @@ add_executable(recorder
     src/voice_processing_test.mm
     src/audio_nodes/audio_nodes.mm
     src/aggregate_device.mm
+    src/audio_engine.mm
 )
 
 # 设置 Objective-C++ 编译选项
