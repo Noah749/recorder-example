@@ -52,7 +52,8 @@ add_subdirectory(deps/spdlog-1.12.0)
 
 # 添加头文件目录
 include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/audio_nodes
     ${CMAKE_CURRENT_SOURCE_DIR}/deps/spdlog-1.12.0/include
 )
 
