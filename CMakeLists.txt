@@ -39,6 +39,7 @@ add_executable(recorder
     src/av_engine_taps_main.mm
     src/voice_processing_test.mm
     src/audio_nodes/audio_nodes.mm
+    src/aggregate_device.mm
 )
 
 # 设置 Objective-C++ 编译选项

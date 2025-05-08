@@ -6,10 +6,11 @@
 #include <vector>
 #include <memory>
 #include <functional>
+#include "aggregate_device.h"
 
 class AudioSystemCapture {
 public:
-    AudioSystemCapture();
+    AudioSystemCapture(AggregateDevice* aggregateDevice = nullptr);
     ~AudioSystemCapture();
     
     // 设置设备ID
@@ -30,7 +31,7 @@ public:
     // 设置音频数据回调
     void SetAudioDataCallback(std::function<void(const AudioBufferList*, UInt32)> callback);
     
-    bool CreateTapDevice();
+    // 读取音频数据
     bool ReadAudioData(float* buffer, size_t count);
     
     // 获取设备 ID
@@ -101,4 +102,5 @@ private:
     bool loopbackEnabled_;
     AudioDeviceIOProcID ioProcID_;
     std::function<void(const AudioBufferList*, UInt32)> audioDataCallback_;
+    AggregateDevice* aggregateDevice_;
 }; 

@@ -139,17 +139,21 @@ public:
     Impl() : ring_buffer_(352800) {} // 8秒的缓冲区
     
     RingBuffer ring_buffer_;
-    AudioDeviceManager device_manager_;
+    // AudioDeviceManager device_manager_;
 };
 
-AudioSystemCapture::AudioSystemCapture() 
+AudioSystemCapture::AudioSystemCapture(AggregateDevice* aggregateDevice) 
     : deviceID_(kAudioObjectUnknown)
     , inputStreamList_(std::make_shared<std::vector<AudioStreamBasicDescription>>())
     , outputStreamList_(std::make_shared<std::vector<AudioStreamBasicDescription>>())
     , recordingEnabled_(false)
     , loopbackEnabled_(false)
     , ioProcID_(nullptr)
-    , impl_(std::make_unique<Impl>()) {
+    , impl_(std::make_unique<Impl>())
+    , aggregateDevice_(aggregateDevice) {
+    if (aggregateDevice_) {
+        SetDeviceID(aggregateDevice_->deviceID);
+    }
 }
 
 AudioSystemCapture::~AudioSystemCapture() {
@@ -427,83 +431,3 @@ bool AudioSystemCapture::ReadAudioData(float* buffer, size_t count) {
 void AudioSystemCapture::ClearRingBuffer() {
     impl_->ring_buffer_.clear();
 }
-
-bool AudioSystemCapture::CreateTapDevice() {
-    // 查找并删除指定名称的设备
-    auto devicesToRemove = impl_->device_manager_.GetAggregateDevicesByName("plaud.ai Aggregate Audio Device");
-    for (const auto& deviceID : devicesToRemove) {
-        auto taps = impl_->device_manager_.GetDeviceTaps(deviceID);
-        for (const auto& tap : taps) {
-            impl_->device_manager_.RemoveTap(tap);
-        }
-        impl_->device_manager_.RemoveAggregateDevice(deviceID);
-    }
-    
-    // 验证设备是否已删除
-    auto remainingDevices = impl_->device_manager_.GetAggregateDevicesByName("plaud.ai Aggregate Audio Device");
-    
-    // 创建新的聚合设备
-    AudioObjectID newDeviceID = impl_->device_manager_.CreateAggregateDevice("plaud.ai Aggregate Audio Device");
-    if (newDeviceID == kAudioObjectUnknown) {
-        Logger::error("创建聚合设备失败");
-        return false;
-    }
-    
-    // 创建 tap
-    AudioObjectID tapID = impl_->device_manager_.CreateTap("plaud.ai tap");
-    if (tapID == kAudioObjectUnknown) {
-        Logger::error("创建 tap 失败");
-        return false;
-    }
-    
-    // 添加 tap 到设备
-    if (!impl_->device_manager_.AddTapToDevice(tapID, newDeviceID)) {
-        Logger::error("添加 tap 到设备失败");
-        return false;
-    }
-    
-    // 设置设备ID
-    SetDeviceID(newDeviceID);
-    
-    // 等待设备初始化
-    usleep(100000); // 100ms
-    
-    // 获取设备的流列表
-    AudioObjectPropertyAddress address = PropertyAddress(kAudioDevicePropertyStreams);
-    UInt32 size = 0;
-    OSStatus error = AudioObjectGetPropertyDataSize(newDeviceID, &address, 0, nullptr, &size);
-    if (error != kAudioHardwareNoError) {
-        Logger::error("获取设备流列表大小失败: %d", (int)error);
-        return false;
-    }
-    
-    std::vector<AudioObjectID> streamList(size / sizeof(AudioObjectID));
-    error = AudioObjectGetPropertyData(newDeviceID, &address, 0, nullptr, &size, streamList.data());
-    if (error != kAudioHardwareNoError) {
-        Logger::error("获取设备流列表失败: %d", (int)error);
-        return false;
-    }
-    
-    // 设置每个流的格式
-    AudioStreamBasicDescription format;
-    memset(&format, 0, sizeof(format));
-    format.mSampleRate = 44100;
-    format.mFormatID = kAudioFormatLinearPCM;
-    format.mFormatFlags = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked;
-    format.mBitsPerChannel = 32;
-    format.mChannelsPerFrame = 2;
-    format.mFramesPerPacket = 1;
-    format.mBytesPerFrame = format.mChannelsPerFrame * format.mBitsPerChannel / 8;
-    format.mBytesPerPacket = format.mBytesPerFrame;
-    
-    address = PropertyAddress(kAudioStreamPropertyVirtualFormat);
-    for (auto streamID : streamList) {
-        error = AudioObjectSetPropertyData(streamID, &address, 0, nullptr, sizeof(format), &format);
-        if (error != kAudioHardwareNoError) {
-            Logger::error("设置流 %u 格式失败: %d", (unsigned int)streamID, (int)error);
-            continue;
-        }
-    }
-    
-    return true;
-} 

@@ -40,17 +40,10 @@ void AudioDataCallback(const AudioBufferList* inInputData, UInt32 inNumberFrames
 void TestAudioEngine() {
     // @autoreleasepool {
         // 创建系统音频捕获
-        systemCapture = new AudioSystemCapture();
+        AggregateDevice aggregateDevice("Plaud.ai.AggregateDevice");
+        systemCapture = new AudioSystemCapture(&aggregateDevice);
         if (!systemCapture) {
             Logger::error("创建系统音频捕获失败");
-            return;
-        }
-
-        // 创建设备并设置设备 ID
-        if (!systemCapture->CreateTapDevice()) {
-            Logger::error("创建 tap 设备失败");
-            delete systemCapture;
-            systemCapture = nullptr;
             return;
         }
 
