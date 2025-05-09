@@ -119,7 +119,7 @@ bool AudioEngine::Prepare() {
     if (!ConnectNodes()) {
         return false;
     }
-    
+
     return true;
 }
 
@@ -219,44 +219,13 @@ bool AudioEngine::CreateNodes() {
     [audioEngine_ attachNode:mixerNode_];
     [audioEngine_ attachNode:sinkNode_];
     [audioEngine_ attachNode:aecAudioUnit_];
-    
-    // 为麦克风输入节点安装 tap
+
+
+    // 引擎启动成功后安装 tap
     Logger::info("正在为麦克风输入节点安装 tap...");
     void (^tapBlock)(AVAudioPCMBuffer * _Nonnull, AVAudioTime * _Nonnull) = ^(AVAudioPCMBuffer * _Nonnull buffer, AVAudioTime * _Nonnull when) {
-                if (micAudioFile_) {
-                    Logger::info("收到麦克风数据: %d 帧", (int)buffer.frameLength);
-                    // 创建临时缓冲区用于格式转换
-                    AudioBufferList interleavedBufferList;
-                    interleavedBufferList.mNumberBuffers = 1;
-                    interleavedBufferList.mBuffers[0].mNumberChannels = buffer.format.channelCount;
-                    interleavedBufferList.mBuffers[0].mDataByteSize = buffer.frameLength * sizeof(float) * buffer.format.channelCount;
-                    interleavedBufferList.mBuffers[0].mData = malloc(interleavedBufferList.mBuffers[0].mDataByteSize);
-
-                    float* interleavedData = (float*)interleavedBufferList.mBuffers[0].mData;
-                    for (UInt32 frame = 0; frame < buffer.frameLength; ++frame) {
-                        for (UInt32 channel = 0; channel < buffer.format.channelCount; ++channel) {
-                            float* channelData = (float*)buffer.audioBufferList->mBuffers[channel].mData;
-                            interleavedData[frame * buffer.format.channelCount + channel] = channelData[frame];
-                        }
-                    }
-
-                    OSStatus status = ExtAudioFileWrite(micAudioFile_, buffer.frameLength, &interleavedBufferList);
-                    if (status != noErr) {
-                        Logger::error("写入麦克风音频数据失败: %d", (int)status);
-                    }
-
-                    free(interleavedBufferList.mBuffers[0].mData);
-                }
-    };
-            
-    [inputNode_ installTapOnBus:0 bufferSize:1024 format: micFormat_ block:tapBlock];
-    Logger::info("麦克风输入节点 tap 安装完成");
-        
-    // 为系统音频源节点安装 tap
-    Logger::info("正在为系统音频源节点安装 tap...");
-    [sourceNode_ installTapOnBus:0 bufferSize:1024 format:standardFormat_ block:^(AVAudioPCMBuffer * _Nonnull buffer, AVAudioTime * _Nonnull when) {
-        Logger::info("收到系统音频数据: %d 帧", (int)buffer.frameLength);
-        if (sourceAudioFile_) {
+        // Logger::info("收到麦克风数据: %d 帧", (int)buffer.frameLength);
+        if (micAudioFile_) {
             // 创建临时缓冲区用于格式转换
             AudioBufferList interleavedBufferList;
             interleavedBufferList.mNumberBuffers = 1;
@@ -272,23 +241,28 @@ bool AudioEngine::CreateNodes() {
                 }
             }
 
-            OSStatus status = ExtAudioFileWrite(sourceAudioFile_, buffer.frameLength, &interleavedBufferList);
+            OSStatus status = ExtAudioFileWrite(micAudioFile_, buffer.frameLength, &interleavedBufferList);
             if (status != noErr) {
-                Logger::error("写入 source 音频数据失败: %d", (int)status);
+                Logger::error("写入麦克风音频数据失败: %d", (int)status);
             }
 
             free(interleavedBufferList.mBuffers[0].mData);
         }
-    }];
-    Logger::info("系统音频源节点 tap 安装完成");
+    };
         
+    [inputNode_ installTapOnBus:0 bufferSize:1024 format: micFormat_ block:tapBlock];
+    Logger::info("麦克风输入节点 tap 安装完成");
+    
+    
     return true;
 }
 
 bool AudioEngine::ConnectNodes() {
     NSError *error = nil;
     
-    // 连接节点
+    Logger::info("正在配置混音器...");
+    
+    // 连接节点（直接连接到混音器）
     [audioEngine_ connect:sourceNode_ to:mixerNode_ format:standardFormat_];
     [audioEngine_ connect:inputNode_ to:aecAudioUnit_ format:micFormat_];
     [audioEngine_ connect:aecAudioUnit_ to:mixerNode_ format:standardFormat_];
@@ -297,7 +271,9 @@ bool AudioEngine::ConnectNodes() {
     // 设置音量
     inputNode_.volume = 0.5;
     sourceNode_.volume = 0.5;
-    mixerNode_.outputVolume = 1.0;
+    // mixerNode_.outputVolume = 1.0;
+    
+    Logger::info("混音器配置完成");
     
     return true;
 }
@@ -333,11 +309,6 @@ bool AudioEngine::CreateAudioFiles() {
                                               &micAudioFile_);
     if (status != noErr) {
         Logger::error("创建麦克风音频文件失败: %d", (int)status);
-        Logger::error("检查以下可能的原因:");
-        Logger::error("1. 文件路径是否有效");
-        Logger::error("2. 是否有写入权限");
-        Logger::error("3. 音频格式参数是否正确");
-        Logger::error("4. 磁盘空间是否足够");
         return false;
     }
     Logger::info("麦克风音频文件创建成功");
@@ -431,6 +402,34 @@ bool AudioEngine::Start() {
         Logger::error("启动音频引擎失败: %s", [[error localizedDescription] UTF8String]);
         return false;
     }
+    
+    Logger::info("正在为系统音频源节点安装 tap...");
+    [sourceNode_ installTapOnBus:0 bufferSize:1024 format:standardFormat_ block:^(AVAudioPCMBuffer * _Nonnull buffer, AVAudioTime * _Nonnull when) {
+        if (sourceAudioFile_) {
+            // 创建临时缓冲区用于格式转换
+            AudioBufferList interleavedBufferList;
+            interleavedBufferList.mNumberBuffers = 1;
+            interleavedBufferList.mBuffers[0].mNumberChannels = buffer.format.channelCount;
+            interleavedBufferList.mBuffers[0].mDataByteSize = buffer.frameLength * sizeof(float) * buffer.format.channelCount;
+            interleavedBufferList.mBuffers[0].mData = malloc(interleavedBufferList.mBuffers[0].mDataByteSize);
+
+            float* interleavedData = (float*)interleavedBufferList.mBuffers[0].mData;
+            for (UInt32 frame = 0; frame < buffer.frameLength; ++frame) {
+                for (UInt32 channel = 0; channel < buffer.format.channelCount; ++channel) {
+                    float* channelData = (float*)buffer.audioBufferList->mBuffers[channel].mData;
+                    interleavedData[frame * buffer.format.channelCount + channel] = channelData[frame];
+                }
+            }
+
+            OSStatus status = ExtAudioFileWrite(sourceAudioFile_, buffer.frameLength, &interleavedBufferList);
+            if (status != noErr) {
+                Logger::error("写入 source 音频数据失败: %d", (int)status);
+            }
+
+            free(interleavedBufferList.mBuffers[0].mData);
+        }
+    }];
+    Logger::info("系统音频源节点 tap 安装完成");
     
     isRunning_ = true;
     isPaused_ = false;
