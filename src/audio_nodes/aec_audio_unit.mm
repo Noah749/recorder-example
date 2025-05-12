@@ -1,4 +1,4 @@
-#import "audio_nodes.h"
+#import "aec_audio_unit.h"
 #include "logger.h"
 
 @implementation AECUnit {
@@ -16,9 +16,9 @@
                                      error:(NSError **)outError {
     self = [super initWithComponentDescription:componentDescription error:outError];
     if (self) {
-        _inputBufferList = NULL;
-        _outputBufferList = NULL;
-        _converter = NULL;
+        _inputBufferList = nil;
+        _outputBufferList = nil;
+        _converter = nil;
         
         // 创建输入和输出总线，使用默认格式
         AVAudioFormat *defaultFormat = [[AVAudioFormat alloc] initStandardFormatWithSampleRate:44100 channels:1];

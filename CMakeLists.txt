@@ -32,7 +32,7 @@ add_executable(recorder
     src/audio_device_manager.mm
     src/audio_system_capture.mm
     src/av_engine_taps_main.mm
-    src/audio_nodes/audio_nodes.mm
+    src/audio_nodes/aec_audio_unit.mm
     src/aggregate_device.mm
     src/audio_engine.mm
 )
