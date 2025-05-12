@@ -234,8 +234,8 @@ bool AudioEngine::ConnectNodes() {
     
     // 连接节点（直接连接到混音器）
     [audioEngine_ connect:sourceNode_ to:mixerNode_ format:standardFormat_];
-    [audioEngine_ connect:inputNode_ to:mixerNode_ format:micFormat_];
-    // [audioEngine_ connect:aecAudioUnit_ to:mixerNode_ format:standardFormat_];
+    [audioEngine_ connect:inputNode_ to:aecAudioUnit_ format:micFormat_];
+    [audioEngine_ connect:aecAudioUnit_ to:mixerNode_ format:standardFormat_];
     [audioEngine_ connect:mixerNode_ to:sinkNode_ format:mixerOutputFormat_];
     
     // 设置音量
@@ -382,7 +382,7 @@ bool AudioEngine::Start() {
     // 安装麦克风输入节点的 tap
     Logger::info("正在为麦克风输入节点安装 tap...");
     void (^tapBlock)(AVAudioPCMBuffer * _Nonnull, AVAudioTime * _Nonnull) = ^(AVAudioPCMBuffer * _Nonnull buffer, AVAudioTime * _Nonnull when) {
-        Logger::info("收到麦克风数据: %d 帧", (int)buffer.frameLength);
+        // Logger::info("收到麦克风数据: %d 帧", (int)buffer.frameLength);
         if (micAudioFile_) {
             // 创建临时缓冲区用于格式转换
             AudioBufferList interleavedBufferList;
@@ -414,7 +414,7 @@ bool AudioEngine::Start() {
     
     Logger::info("正在为系统音频源节点安装 tap...");
     [sourceNode_ installTapOnBus:0 bufferSize: 512 format:standardFormat_ block:^(AVAudioPCMBuffer * _Nonnull buffer, AVAudioTime * _Nonnull when) {
-        Logger::info("收到系统音频数据: %d 帧", (int)buffer.frameLength);
+        // Logger::info("收到系统音频数据: %d 帧", (int)buffer.frameLength);
         if (sourceAudioFile_) {
             // 创建临时缓冲区用于格式转换
             AudioBufferList interleavedBufferList;
