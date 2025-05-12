@@ -619,17 +619,6 @@ void TestAudioEngine() {
         [mixOutputPath UTF8String]
     );
 
-    // 4. 准备音频引擎
-    Logger::info("正在准备音频引擎...");
-    if (!audioEngine.Prepare()) {
-        Logger::error("准备音频引擎失败，检查以下可能的原因:");
-        Logger::error("1. 文件路径权限");
-        Logger::error("2. 音频设备权限");
-        Logger::error("3. 系统音频设置");
-        return;
-    }
-    Logger::info("音频引擎准备完成");
-
     // 5. 启动音频引擎
     Logger::info("正在启动音频引擎...");
     if (!audioEngine.Start()) {
