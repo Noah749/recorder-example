@@ -6,8 +6,6 @@
   "scripts": {
     "install": "node-gyp-build",
     "test": "node test.js",
-    "download-deps": "node scripts/download-deps.js",
-    "prebuild": "npm run download-deps",
     "build": "node-gyp rebuild",
     "pack": "node scripts/pack.js",
     "prepublishOnly": "npm run build"

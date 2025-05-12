@@ -1,5 +1,5 @@
 #include <napi.h>
-#include "../recorder.h"
+#include "../../include/recorder.h"
 #include <iostream>
 
 class RecorderWrapper : public Napi::ObjectWrap<RecorderWrapper> {

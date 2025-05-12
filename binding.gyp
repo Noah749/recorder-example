@@ -26,7 +26,7 @@
         "./include",
         "./src",
         "./src/nodejs",
-        "./deps/spdlog-1.12.0/include"
+        "./third_party/spdlog-1.12.0/include"
       ],
       "defines": [
         "NAPI_DISABLE_CPP_EXCEPTIONS",
