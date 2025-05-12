@@ -7,7 +7,6 @@
 #include <iomanip>
 #include "recorder.h"
 #include "logger.h"
-#include "mic_recorder.h"
 #include <CoreAudio/CoreAudio.h>
 #include "aggregate_device.h"
 
