@@ -24,20 +24,14 @@ find_library(CoreServices CoreServices REQUIRED)
 
 # 添加源文件
 add_executable(recorder
-    # src/test_microphone.cpp
     src/main.cpp
     src/recorder.cpp
     src/mac_recorder.cpp
-    src/microphone_capture.cpp
     src/ring_buffer.cpp
     src/logger.cpp
-    src/mic_recorder.mm
-    src/mic_recorder_main.mm
-    src/system_capture_recorder_main.mm
     src/audio_device_manager.mm
     src/audio_system_capture.mm
     src/av_engine_taps_main.mm
-    src/voice_processing_test.mm
     src/audio_nodes/audio_nodes.mm
     src/aggregate_device.mm
     src/audio_engine.mm
