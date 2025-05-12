@@ -8,7 +8,7 @@
 #include <condition_variable>
 #include "audio_device_manager.h"
 #include "logger.h"
-
+#include "ring_buffer.h"
 constexpr AudioObjectPropertyAddress PropertyAddress(AudioObjectPropertySelector selector,
                                                      AudioObjectPropertyScope scope = kAudioObjectPropertyScopeGlobal,
                                                      AudioObjectPropertyElement element = kAudioObjectPropertyElementMain) noexcept {
@@ -20,126 +20,11 @@ enum class StreamDirection : UInt32 {
     input
 };
 
-class RingBuffer {
-public:
-    RingBuffer(size_t size) 
-        : buffer_(size)
-        , read_pos_(0)
-        , write_pos_(0)
-        , size_(size)
-        , overflow_count_(0)
-        , underflow_count_(0)
-        , max_used_size_(0) {
-    }
-    
-    bool write(const float* data, size_t count) {
-        std::unique_lock<std::mutex> lock(mutex_);
-        
-        // 如果缓冲区已满，直接返回 false
-        if (available_write() < count) {
-            overflow_count_++;
-            if (overflow_count_ % 100 == 0) {
-            }
-            return false;
-        }
-        
-        // 写入数据
-        for (size_t i = 0; i < count; ++i) {
-            buffer_[write_pos_] = data[i];
-            write_pos_ = (write_pos_ + 1) % size_;
-        }
-        
-        // 更新最大使用量
-        size_t used_size = available_read();
-        if (used_size > max_used_size_) {
-            max_used_size_ = used_size;
-        }
-        
-        cv_.notify_one();
-        return true;
-    }
-    
-    bool read(float* data, size_t count) {
-        std::unique_lock<std::mutex> lock(mutex_);
-        
-        // 如果数据不足，等待一段时间
-        if (available_read() < count) {
-            if (cv_.wait_for(lock, std::chrono::milliseconds(10), 
-                           [this, count] { return available_read() >= count; })) {
-                // 超时后仍然没有足够的数据，返回 false
-                underflow_count_++;
-                if (underflow_count_ % 100 == 0) {
-                }
-                return false;
-            }
-        }
-        
-        // 读取数据
-        for (size_t i = 0; i < count; ++i) {
-            data[i] = buffer_[read_pos_];
-            read_pos_ = (read_pos_ + 1) % size_;
-        }
-        return true;
-    }
-    
-    size_t available_read() const {
-        if (write_pos_ >= read_pos_) {
-            return write_pos_ - read_pos_;
-        }
-        return size_ - read_pos_ + write_pos_;
-    }
-    
-    size_t available_write() const {
-        return size_ - available_read() - 1;
-    }
-    
-    // 获取统计信息
-    struct Stats {
-        size_t overflow_count;
-        size_t underflow_count;
-        size_t max_used_size;
-        size_t current_size;
-    };
-    
-    Stats get_stats() const {
-        std::unique_lock<std::mutex> lock(mutex_);
-        return {
-            overflow_count_,
-            underflow_count_,
-            max_used_size_,
-            size_
-        };
-    }
-    
-    void clear() {
-        std::unique_lock<std::mutex> lock(mutex_);
-        read_pos_ = 0;
-        write_pos_ = 0;
-        overflow_count_ = 0;
-        underflow_count_ = 0;
-        max_used_size_ = 0;
-    }
-    
-private:
-    std::vector<float> buffer_;
-    size_t read_pos_;
-    size_t write_pos_;
-    size_t size_;
-    mutable std::mutex mutex_;
-    std::condition_variable cv_;
-    
-    // 统计信息
-    size_t overflow_count_;    // 溢出次数
-    size_t underflow_count_;   // 欠载次数
-    size_t max_used_size_;     // 最大使用量
-};
-
 class AudioSystemCapture::Impl {
 public:
-    Impl() : ring_buffer_(352800) {} // 8秒的缓冲区
+    Impl() : ring_buffer_(44100 * 2) {}
     
     RingBuffer ring_buffer_;
-    // AudioDeviceManager device_manager_;
 };
 
 AudioSystemCapture::AudioSystemCapture(AggregateDevice* aggregateDevice) 
