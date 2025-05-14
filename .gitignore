@@ -8,3 +8,5 @@ cmake
 .idea
 CapturingSystemAudioWithCoreAudioTaps-oc
 test-recording.wav
+.cipd
+third_party/webrtc/.cipd
