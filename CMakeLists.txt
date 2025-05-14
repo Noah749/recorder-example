@@ -96,26 +96,3 @@ set_target_properties(recorder PROPERTIES
 install(TARGETS recorder
     RUNTIME DESTINATION bin
 )
-
-# 添加 entitlements 文件
-set_target_properties(recorder PROPERTIES
-    XCODE_ATTRIBUTE_CODE_SIGN_ENTITLEMENTS "${CMAKE_CURRENT_SOURCE_DIR}/src/recorder.entitlements"
-)
-
-# 创建 entitlements 文件
-file(WRITE ${CMAKE_CURRENT_SOURCE_DIR}/src/recorder.entitlements
-    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-    "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
-    "<plist version=\"1.0\">\n"
-    "<dict>\n"
-    "    <key>com.apple.security.app-sandbox</key>\n"
-    "    <true/>\n"
-    "    <key>com.apple.security.assets.music.read-write</key>\n"
-    "    <true/>\n"
-    "    <key>com.apple.security.device.audio-input</key>\n"
-    "    <true/>\n"
-    "    <key>com.apple.security.files.user-selected.read-write</key>\n"
-    "    <true/>\n"
-    "</dict>\n"
-    "</plist>\n"
-)
