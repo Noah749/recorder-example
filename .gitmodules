@@ -1,3 +1,3 @@
-[submodule "third_party/webrtc"]
-	path = third_party/webrtc
-	url = https://github.com/webrtc-sdk/webrtc
+[submodule "third_party/webrtc/src"]
+	path = third_party/webrtc/src
+	url = https://webrtc.googlesource.com/src.git

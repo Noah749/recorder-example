@@ -36,7 +36,15 @@ use_lld=false
 ```
 
 ```bash
+cd webrtc/src
+
 gn gen out/apm --args='is_debug=false use_lld=false'
 
 ninja -C out/apm modules/audio_processing:audio_processing
+```
+
+## 清理编译
+
+```bash
+ninja -C out/apm -t clean
 ```
