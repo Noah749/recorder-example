@@ -32,7 +32,7 @@ void Logger::init(const std::string& logDir) {
         console_sink->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%^%l%$] [%t] %v");
         
         auto file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
-            logDirectory + "/meeting_recorder.log", 
+            logDirectory + "/recorder.log", 
             1024 * 1024 * 5,  // 5MB
             3                  // 保留3个文件
         );
