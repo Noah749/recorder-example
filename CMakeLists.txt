@@ -79,6 +79,7 @@ target_link_libraries(recorder PRIVATE
     ${CoreFoundation}
     ${CoreServices}
     ${WEBRTC_LIB_DIR}/modules/audio_processing/libaudio_processing.a
+    ${WEBRTC_LIB_DIR}/api/audio/libaudio_processing.a
     # c++
     # c++abi
     # -lstdc++

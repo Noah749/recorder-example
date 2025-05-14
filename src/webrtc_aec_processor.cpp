@@ -14,9 +14,11 @@ WebRTCAECProcessor::WebRTCAECProcessor() {
     config.gain_controller1.enabled = true;
     config.gain_controller1.mode = AudioProcessing::Config::GainController1::kAdaptiveDigital;
     
-    auto env = EnvironmentFactory().Create();
-    auto apm = BuiltinAudioProcessingBuilder(config).Build(env);
-    apm_ = std::unique_ptr<AudioProcessing>(apm.get());
+
+    apm_->ApplyConfig(config);
+    // auto env = EnvironmentFactory().Create();
+    // auto apm = BuiltinAudioProcessingBuilder(config).Build(env);
+    // apm_ = std::unique_ptr<AudioProcessing>(apm.get());
 }
 
 WebRTCAECProcessor::~WebRTCAECProcessor() {
