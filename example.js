@@ -5,10 +5,6 @@ const path = require('path');
 // 创建录音器实例
 const recorder = new Recorder();
 
-// 创建聚合设备
-const deviceID = recorder.createAggregateDevice('Plaud.ai.AggregateDevice');
-console.log('聚合设备创建成功，ID:', deviceID);
-
 // 初始化系统音频捕获
 const initResult = recorder.initSystemCapture();
 console.log('系统音频捕获初始化:', initResult);

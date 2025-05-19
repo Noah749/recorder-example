@@ -180,6 +180,9 @@ private:
 
     Napi::Value InitSystemCapture(const Napi::CallbackInfo& info) {
         Napi::Env env = info.Env();
+
+        // 创建聚合设备
+        aggregateDevice_ = new AggregateDevice("Plaud.ai.AggregateDevice");
         
         if (!aggregateDevice_) {
             Napi::Error::New(env, "Aggregate device not initialized").ThrowAsJavaScriptException();
