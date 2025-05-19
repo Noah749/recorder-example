@@ -56,9 +56,9 @@ recorder.setSystemCaptureCallback((audioData) => {
             saveAsWav(allAudioData, wavPath);
             console.log('WAV 文件已保存到:', wavPath);
 
-            // 释放聚合设备
-            recorder.releaseAggregateDevice();
-            console.log('聚合设备已释放');
+            // 删除 recorder
+            recorder.delete();
+            recorder = null;
             // 强制退出进程
             process.exit(0);
         }
@@ -75,7 +75,6 @@ process.on('SIGINT', () => {
     console.log('\n正在清理资源...');
     isRecording = false;
     recorder.stopSystemCapture();
-    recorder.releaseAggregateDevice();
     process.exit(0);
 });
 
