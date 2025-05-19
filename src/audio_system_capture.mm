@@ -291,13 +291,13 @@ OSStatus AudioSystemCapture::IOProc(
         size_t sampleCount = numberFrames * inputBuffer.mNumberChannels;
         
         // 写入数据
-        if (!capture->impl_->ring_buffer_.write(audioData, sampleCount)) {
-            // 写入失败，可能是缓冲区已满，等待一段时间后重试
-            usleep(1000); // 1ms
-            if (!capture->impl_->ring_buffer_.write(audioData, sampleCount)) {
-                Logger::warn("写入环形缓冲区失败，丢弃数据");
-            }
-        }
+        // if (!capture->impl_->ring_buffer_.write(audioData, sampleCount)) {
+        //     // 写入失败，可能是缓冲区已满，等待一段时间后重试
+        //     // usleep(1000); // 1ms
+        //     if (!capture->impl_->ring_buffer_.write(audioData, sampleCount)) {
+        //         Logger::warn("写入环形缓冲区失败，丢弃数据");
+        //     }
+        // }
         
         // 如果设置了回调函数，则调用
         if (capture->audioDataCallback_) {

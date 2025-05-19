@@ -13,6 +13,8 @@
         "src/audio_system_capture.h",
         "src/audio_device_manager.mm",
         "src/audio_device_manager.h",
+        "src/aggregate_device.mm",
+        "src/aggregate_device.h",
         "src/logger.cpp",
         "src/logger.h",
         "src/ring_buffer.cpp",

@@ -35,7 +35,7 @@ add_executable(recorder
     src/audio_nodes/aec_audio_unit.mm
     src/aggregate_device.mm
     src/audio_engine.mm
-    src/webrtc_aec_processor.cpp
+    # src/webrtc_aec_processor.cpp
 )
 
 # 添加 libc++ 标志
@@ -57,16 +57,16 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/include/audio_nodes
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/spdlog-1.12.0/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/webrtc/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/webrtc/src/modules/audio_processing/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/webrtc/src/api/audio
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/webrtc/src/rtc_base
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/webrtc/src/third_party/abseil-cpp
+    # ${CMAKE_CURRENT_SOURCE_DIR}/third_party/webrtc/src
+    # ${CMAKE_CURRENT_SOURCE_DIR}/third_party/webrtc/src/modules/audio_processing/include
+    # ${CMAKE_CURRENT_SOURCE_DIR}/third_party/webrtc/src/api/audio
+    # ${CMAKE_CURRENT_SOURCE_DIR}/third_party/webrtc/src/rtc_base
+    # ${CMAKE_CURRENT_SOURCE_DIR}/third_party/webrtc/src/third_party/abseil-cpp
 )
 
 # 添加 WebRTC 库路径
-set(WEBRTC_LIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/webrtc/src/out/apm/obj")
-set(WEBRTC_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/webrtc/src")
+# set(WEBRTC_LIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/webrtc/src/out/apm/obj")
+# set(WEBRTC_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/webrtc/src")
 
 # 合并所有链接库到一个调用中
 target_link_libraries(recorder PRIVATE
@@ -78,8 +78,8 @@ target_link_libraries(recorder PRIVATE
     ${AudioUnit}
     ${CoreFoundation}
     ${CoreServices}
-    ${WEBRTC_LIB_DIR}/modules/audio_processing/libaudio_processing.a
-    ${WEBRTC_LIB_DIR}/api/audio/libaudio_processing.a
+    # ${WEBRTC_LIB_DIR}/modules/audio_processing/libaudio_processing.a
+    # ${WEBRTC_LIB_DIR}/api/audio/libaudio_processing.a
     # c++
     # c++abi
     # -lstdc++
