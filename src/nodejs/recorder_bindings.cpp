@@ -25,7 +25,8 @@ public:
             InstanceMethod("initSystemCapture", &RecorderWrapper::InitSystemCapture),
             InstanceMethod("startSystemCapture", &RecorderWrapper::StartSystemCapture),
             InstanceMethod("stopSystemCapture", &RecorderWrapper::StopSystemCapture),
-            InstanceMethod("setSystemCaptureCallback", &RecorderWrapper::SetSystemCaptureCallback)
+            InstanceMethod("setSystemCaptureCallback", &RecorderWrapper::SetSystemCaptureCallback),
+            InstanceMethod("getAudioFormat", &RecorderWrapper::GetAudioFormat)
         });
 
         exports.Set("Recorder", func);
@@ -241,6 +242,7 @@ private:
         std::vector<float> data;
         UInt32 numberFrames;
         UInt32 numberChannels;
+        double timestamp;
     };
 
     std::queue<AudioData> audioDataQueue_;
@@ -266,6 +268,7 @@ private:
                 Napi::Object audioDataObj = Napi::Object::New(env);
                 audioDataObj.Set("numberFrames", Napi::Number::New(env, data->numberFrames));
                 audioDataObj.Set("numberChannels", Napi::Number::New(env, data->numberChannels));
+                audioDataObj.Set("timestamp", Napi::Number::New(env, data->timestamp));
                 
                 Napi::ArrayBuffer arrayBuffer = Napi::ArrayBuffer::New(env, data->data.size() * sizeof(float));
                 memcpy(arrayBuffer.Data(), data->data.data(), data->data.size() * sizeof(float));
@@ -308,7 +311,7 @@ private:
             isProcessing_ = true;
             std::thread([this] { ProcessAudioData(); }).detach();
 
-            systemCapture_->SetAudioDataCallback([this](const AudioBufferList* bufferList, UInt32 numberFrames) {
+            systemCapture_->SetAudioDataCallback([this](const AudioBufferList* bufferList, UInt32 numberFrames, double timestamp) {
                 if (bufferList && bufferList->mNumberBuffers > 0) {
                     const AudioBuffer& audioBuffer = bufferList->mBuffers[0];
                     float* audioData = static_cast<float*>(audioBuffer.mData);
@@ -318,6 +321,7 @@ private:
                     data.data.assign(audioData, audioData + sampleCount);
                     data.numberFrames = numberFrames;
                     data.numberChannels = audioBuffer.mNumberChannels;
+                    data.timestamp = timestamp;
                     
                     {
                         std::lock_guard<std::mutex> lock(queueMutex_);
@@ -328,6 +332,38 @@ private:
             });
             
             return Napi::Boolean::New(env, true);
+        } catch (const std::exception& e) {
+            Napi::Error::New(env, e.what()).ThrowAsJavaScriptException();
+            return env.Null();
+        }
+    }
+
+    Napi::Value GetAudioFormat(const Napi::CallbackInfo& info) {
+        Napi::Env env = info.Env();
+        
+        if (!systemCapture_) {
+            Napi::Error::New(env, "System capture not initialized").ThrowAsJavaScriptException();
+            return env.Null();
+        }
+
+        try {
+            AudioStreamBasicDescription format;
+            if (!systemCapture_->GetAudioFormat(format)) {
+                Napi::Error::New(env, "Failed to get audio format").ThrowAsJavaScriptException();
+                return env.Null();
+            }
+            
+            Napi::Object formatObj = Napi::Object::New(env);
+            formatObj.Set("sampleRate", Napi::Number::New(env, format.mSampleRate));
+            formatObj.Set("channels", Napi::Number::New(env, format.mChannelsPerFrame));
+            formatObj.Set("bitsPerChannel", Napi::Number::New(env, format.mBitsPerChannel));
+            formatObj.Set("formatID", Napi::Number::New(env, format.mFormatID));
+            formatObj.Set("formatFlags", Napi::Number::New(env, format.mFormatFlags));
+            formatObj.Set("bytesPerFrame", Napi::Number::New(env, format.mBytesPerFrame));
+            formatObj.Set("framesPerPacket", Napi::Number::New(env, format.mFramesPerPacket));
+            formatObj.Set("bytesPerPacket", Napi::Number::New(env, format.mBytesPerPacket));
+            
+            return formatObj;
         } catch (const std::exception& e) {
             Napi::Error::New(env, e.what()).ThrowAsJavaScriptException();
             return env.Null();

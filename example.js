@@ -2,14 +2,6 @@ const { Recorder } = require('./build/Release/recorder');
 const fs = require('fs');
 const path = require('path');
 
-// 音频参数
-const AUDIO_CONFIG = {
-    sampleRate: 48000,    // 48kHz 采样率
-    channels: 2,          // 双声道
-    bitsPerSample: 32,    // 32 位深度
-    format: 'float32'     // 32 位浮点格式
-};
-
 // 创建录音器实例
 const recorder = new Recorder();
 
@@ -21,6 +13,19 @@ console.log('聚合设备创建成功，ID:', deviceID);
 const initResult = recorder.initSystemCapture();
 console.log('系统音频捕获初始化:', initResult);
 
+// 获取音频格式
+const audioFormat = recorder.getAudioFormat();
+console.log('音频格式:', {
+    采样率: audioFormat.sampleRate + ' Hz',
+    声道数: audioFormat.channels,
+    位深度: audioFormat.bitsPerChannel + ' bits',
+    格式ID: audioFormat.formatID,
+    格式标志: audioFormat.formatFlags,
+    每帧字节数: audioFormat.bytesPerFrame,
+    每包帧数: audioFormat.framesPerPacket,
+    每包字节数: audioFormat.bytesPerPacket
+});
+
 // 存储所有音频数据
 const allAudioData = [];
 let isRecording = false;
@@ -28,12 +33,39 @@ let isRecording = false;
 // 设置音频数据回调
 recorder.setSystemCaptureCallback((audioData) => {
     if (isRecording) {
+        if (audioData.timestamp > 10) {
+            // 停止录音
+            isRecording = false;
+        }
+
         // 存储音频数据
         allAudioData.push({
             frames: audioData.numberFrames,
             channels: audioData.numberChannels,
+            timestamp: audioData.timestamp,
             data: new Float32Array(audioData.data)
         });
+        
+        // 计算平均音量
+        const samples = new Float32Array(audioData.data);
+        const volume = samples.reduce((sum, sample) => sum + Math.abs(sample), 0) / samples.length;
+        console.log(`时间戳: ${audioData.timestamp.toFixed(3)}s, 平均音量: ${volume.toFixed(4)}`);
+
+        if (!isRecording) {
+            recorder.stopSystemCapture();
+            console.log('系统音频捕获已停止');
+
+            // 保存为 WAV 文件
+            const wavPath = path.join(__dirname, 'output.wav');
+            saveAsWav(allAudioData, wavPath);
+            console.log('WAV 文件已保存到:', wavPath);
+
+            // 释放聚合设备
+            recorder.releaseAggregateDevice();
+            console.log('聚合设备已释放');
+            // 强制退出进程
+            process.exit(0);
+        }
     }
 });
 
@@ -42,41 +74,22 @@ const startResult = recorder.startSystemCapture();
 console.log('开始系统音频捕获:', startResult);
 isRecording = true;
 
-// 等待一段时间后停止
-setTimeout(() => {
-    // 停止录音
+// 处理进程退出
+process.on('SIGINT', () => {
+    console.log('\n正在清理资源...');
     isRecording = false;
     recorder.stopSystemCapture();
-    console.log('系统音频捕获已停止');
-    
-    // 保存原始音频数据
-    // const rawDataPath = path.join(__dirname, 'audio_data.json');
-    // fs.writeFileSync(rawDataPath, JSON.stringify({
-    //     sampleRate: AUDIO_CONFIG.sampleRate,
-    //     channels: AUDIO_CONFIG.channels,
-    //     bitsPerSample: AUDIO_CONFIG.bitsPerSample,
-    //     format: AUDIO_CONFIG.format,
-    //     data: allAudioData.map(frame => Array.from(frame.data))
-    // }, null, 2));
-    // console.log('原始音频数据已保存到:', rawDataPath);
-    
-    // 保存为 WAV 文件
-    const wavPath = path.join(__dirname, 'output.wav');
-    saveAsWav(allAudioData, wavPath);
-    console.log('WAV 文件已保存到:', wavPath);
-    
-    // 释放聚合设备
     recorder.releaseAggregateDevice();
-    console.log('聚合设备已释放');
-}, 10000); // 10秒后停止
+    process.exit(0);
+});
 
 // 保存为 WAV 文件的函数
 function saveAsWav(audioData, filePath) {
-    const { sampleRate, channels, bitsPerSample } = AUDIO_CONFIG;
+    const { sampleRate, channels, bitsPerChannel } = audioFormat;
     
     // 计算总数据长度
     const totalSamples = audioData.reduce((sum, frame) => sum + frame.data.length, 0);
-    const dataSize = totalSamples * (bitsPerSample / 8);
+    const dataSize = totalSamples * (bitsPerChannel / 8);
     const headerSize = 44;
     const fileSize = headerSize + dataSize;
     
@@ -101,11 +114,11 @@ function saveAsWav(audioData, filePath) {
     // 采样率
     buffer.writeUInt32LE(sampleRate, 24);
     // 字节率
-    buffer.writeUInt32LE(sampleRate * channels * (bitsPerSample / 8), 28);
+    buffer.writeUInt32LE(sampleRate * channels * (bitsPerChannel / 8), 28);
     // 块对齐
-    buffer.writeUInt16LE(channels * (bitsPerSample / 8), 32);
+    buffer.writeUInt16LE(channels * (bitsPerChannel / 8), 32);
     // 位深度
-    buffer.writeUInt16LE(bitsPerSample, 34);
+    buffer.writeUInt16LE(bitsPerChannel, 34);
     // "data" 标识
     buffer.write('data', 36);
     // 数据大小

@@ -53,7 +53,7 @@ void AudioSystemCapture::SetDeviceID(AudioObjectID deviceID) {
     AdaptToDevice(deviceID);
 }
 
-void AudioSystemCapture::SetAudioDataCallback(std::function<void(const AudioBufferList*, UInt32)> callback) {
+void AudioSystemCapture::SetAudioDataCallback(std::function<void(const AudioBufferList*, UInt32, Float64)> callback) {
     audioDataCallback_ = std::move(callback);
 }
 
@@ -290,18 +290,11 @@ OSStatus AudioSystemCapture::IOProc(
         float* audioData = static_cast<float*>(inputBuffer.mData);
         size_t sampleCount = numberFrames * inputBuffer.mNumberChannels;
         
-        // 写入数据
-        // if (!capture->impl_->ring_buffer_.write(audioData, sampleCount)) {
-        //     // 写入失败，可能是缓冲区已满，等待一段时间后重试
-        //     // usleep(1000); // 1ms
-        //     if (!capture->impl_->ring_buffer_.write(audioData, sampleCount)) {
-        //         Logger::warn("写入环形缓冲区失败，丢弃数据");
-        //     }
-        // }
-        
         // 如果设置了回调函数，则调用
         if (capture->audioDataCallback_) {
-            capture->audioDataCallback_(inInputData, numberFrames);
+            // 使用输入时间戳
+            double timestamp = inInputTime->mSampleTime / capture->format_.mSampleRate;
+            capture->audioDataCallback_(inInputData, numberFrames, timestamp);
         }
     }
     
@@ -315,4 +308,19 @@ bool AudioSystemCapture::ReadAudioData(float* buffer, size_t count) {
 
 void AudioSystemCapture::ClearRingBuffer() {
     impl_->ring_buffer_.clear();
+}
+
+bool AudioSystemCapture::GetAudioFormat(AudioStreamBasicDescription& format) {
+    if (deviceID_ == kAudioObjectUnknown) {
+        return false;
+    }
+    
+    CatalogDeviceStreams();
+    if (inputStreamList_->empty()) {
+        return false;
+    }
+    
+    format = inputStreamList_->front();
+    format_ = format;  // 保存格式信息
+    return true;
 }

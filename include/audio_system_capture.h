@@ -8,9 +8,13 @@
 #include <functional>
 #include "aggregate_device.h"
 
+class AggregateDevice;
+
 class AudioSystemCapture {
 public:
-    AudioSystemCapture(AggregateDevice* aggregateDevice = nullptr);
+    using AudioDataCallback = std::function<void(const AudioBufferList* bufferList, UInt32 numberFrames, double timestamp)>;
+    
+    AudioSystemCapture(AggregateDevice* aggregateDevice);
     ~AudioSystemCapture();
     
     // 设置设备ID
@@ -29,7 +33,7 @@ public:
     void StopLoopback();
     
     // 设置音频数据回调
-    void SetAudioDataCallback(std::function<void(const AudioBufferList*, UInt32)> callback);
+    void SetAudioDataCallback(AudioDataCallback callback);
     
     // 读取音频数据
     bool ReadAudioData(float* buffer, size_t count);
@@ -41,19 +45,7 @@ public:
     void ClearRingBuffer();
     
     // 获取音频格式
-    bool GetAudioFormat(AudioStreamBasicDescription& format) {
-        if (deviceID_ == kAudioObjectUnknown) {
-            return false;
-        }
-        
-        CatalogDeviceStreams();
-        if (inputStreamList_->empty()) {
-            return false;
-        }
-        
-        format = inputStreamList_->front();
-        return true;
-    }
+    bool GetAudioFormat(AudioStreamBasicDescription& format);
     
 private:
     class Impl;
@@ -101,6 +93,7 @@ private:
     bool recordingEnabled_;
     bool loopbackEnabled_;
     AudioDeviceIOProcID ioProcID_;
-    std::function<void(const AudioBufferList*, UInt32)> audioDataCallback_;
+    AudioDataCallback audioDataCallback_;
     AggregateDevice* aggregateDevice_;
+    AudioStreamBasicDescription format_;
 }; 
